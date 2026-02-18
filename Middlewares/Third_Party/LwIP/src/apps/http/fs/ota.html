@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Обновление программного обеспечения</title>
+<script>
+async function processing() {
+let bar = document.getElementById("bar");
+if (bar.textContent.length > 100) {
+bar.textContent = "";
+} else {
+bar.textContent += "|";
+}
+//timerId = setTimeout(processing, 500);
+setTimeout(processing, 500);
+}
+async function upload() {
+let uploadfile = document.getElementById("fw").files;
+if (uploadfile.length == 0) {
+alert("Файл не выбран!");
+} else if (uploadfile[0].size != 917504) {
+alert("Неверный размер файла!");
+} else {
+document.getElementById("fw").disabled = true;
+document.getElementById("upload").disabled = true;
+document.getElementById("bar").textContent = "";
+document.getElementById("bar").style.visibility ="visible";
+let formData = new FormData();
+formData.append("fw", uploadfile[0]);
+let crc = document.getElementById("crc");
+let xhr = new XMLHttpRequest();
+xhr.open("POST", "/upload", true);
+xhr.timeout = 180000; // 3 min
+xhr.upload.ontimeout = function () {
+console.log("Upload timeout.");
+};
+xhr.upload.onloadstart = function() {
+console.log("Upload has started.");
+};
+xhr.upload.onload = function() {
+console.log("Upload completed successfully.");
+crc.textContent = "Идет процесс обработки файла.";
+//var timerId = setTimeout(processing, 500);
+setTimeout(processing, 500);
+};
+xhr.upload.onerror = function() {
+console.log("Error during the upload: " + xhr.status);
+};
+xhr.upload.onprogress = function (e) {
+let progress = document.getElementById("progress");
+progress.textContent = "Файл загружен на: " + (e.loaded / e.total * 100).toFixed(0) + "%";
+};
+xhr.onload = function() {
+if (xhr.status != 200) {
+console.log(xhr.status + " : " + xhr.statusText);
+} else {
+let myObj = 0;
+try {
+myObj = JSON.parse(xhr.responseText);    
+} catch (e) {
+myObj = 0;
+}
+if (myObj.crc == "0") {
+console.log("CRC ERROR");
+crc.textContent = "Ошибка контрольной суммы. Повторите загрузку файла.";
+document.getElementById("fw").disabled = false;
+document.getElementById("upload").disabled = false;
+document.getElementById("bar").style.visibility ="hidden";
+//clearTimeout(timerId);
+} else {
+console.log("CRC OK");
+crc.textContent = "Контрольная сумма проверена. Система будет перезагружена.";
+document.getElementById("bar").textContent = "";
+setTimeout(function() { window.location.href = '/';}, 10000);
+}
+}
+};
+xhr.send(formData);
+delete xhr;
+}
+}
+</script>
+</head>
+<body>
+<h2>Обновление программого обеспечения</h2>
+<div>
+<label for="fw">Файл :</label>
+<input type="file" id="fw" name="fw" accept=".bin"/>
+</div>
+<br>
+<div>
+<button id="upload" type="button" onclick="upload()">Загрузить</button>
+</div>
+<br>
+<div id="progress"></div>
+<br>
+<div id="crc"></div>
+<br>
+<div id="bar"></div>
+</body>
+</html>

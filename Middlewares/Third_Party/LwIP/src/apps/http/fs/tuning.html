@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style type="text/css">
+body, input, button, select {
+  font-family: Georgia, Times, Times New Roman, sans-serif ;
+  font-style: normal;
+  font-size: 15px;
+  color: #1F2833;
+}
+label {
+  cursor: help;
+}
+input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+input[type="button"] {
+    width: 150px;
+}
+input:invalid {
+    background: #ffd8d8;
+}
+input:valid {
+    background: #d8ffd8;
+}
+.hide {
+    height: 0; 
+    transition: all 3s;
+    display: none;
+}
+button {
+    width: 150px;
+}
+.right_col {
+    width: 40%;
+}
+.left_col {
+    width: 60%;
+}
+.frame {
+display: none;
+width: 100%;
+}
+.pident {
+width: 100%;
+display: flex;
+justify-content: space-between;
+}
+.ident {
+text-align: center;
+background-color: #dff2ef;
+}
+.elem0 {
+    display: flex;
+    width: 100%;    
+    margin-bottom: 5px;
+    margin-right: 0px;
+    background-color: #dff2ef;
+}
+</style>
+<title>Web конфигуратор</title>
+</head>
+
+<body style="width:640px;">
+
+<div id="usk" style="width:100%;">
+<hr/>
+  <div class="pident">
+    <div id="version" class="ident">Версия ПО 0.0.0</div>
+    <div id="serial" class="ident">Серийный № 0000</div>
+    <div id="mac" class="ident">MAC 00:10:A1:72:00:00</div>
+    <div id="uptime" class="ident">000 д 00 ч 00 м 00 c</div>
+  </div>
+  <hr/>
+<!-- 0 -->
+  <div class="elem0">
+    <div class="left_col">
+      <label for="hysteresis_window" title="от 0.1 до 2.0 МПа">Окно гистерезиса давления в гидроцилидре, МПа</label>
+    </div>
+    <div class="right_col">
+      <input type="text" id="hysteresis_window" name="val" placeholder="Укажите значение" required pattern="^\d{1}(?:[,.]\d{1,3}|$)$">
+    </div>
+  </div>
+<!-- 1 -->
+  <div class="elem0">
+    <div class="left_col">
+      <label for="self_test_duration" title="от 1 до 10 c">Длительность тестирования хода гидроцилидра, с</label>
+    </div>
+    <div class="right_col">
+      <input type="text" id="self_test_duration" name="val" placeholder="Укажите значение" required pattern="\d{1,2}" >
+    </div>
+  </div>
+<!-- 2 -->
+<div class="elem0">
+  <div class="left_col">
+    <label for="min_stroke_rod" title="от 20 до 100 мм">Ход штока гидроцилидра при самотестирования, мм</label>
+  </div>
+  <div class="right_col">
+    <input type="text" id="min_stroke_rod" name="val" placeholder="Укажите значение" required pattern="\d{1,2}" >
+  </div>
+</div>
+<!-- 3 -->
+<hr/>
+<div class="elem0">
+  <div class="left_col">
+    <label for="min_stroke" title="от 0 до 100 мм">MIN положение гидроцилидра, мм</label>
+  </div>
+  <div class="right_col">
+    <input type="text" id="min_stroke" name="val" placeholder="Укажите значение" required pattern="\d{1,4}" >
+  </div>
+</div>
+<!-- 4 -->
+<div class="elem0">
+  <div class="left_col">
+    <label for="adc_min_stroke" title="от 0 до 10 В">Напряжение при MIN положении гидроцилидра, В</label>
+  </div>
+  <div class="right_col">
+    <input type="text" id="adc_min_stroke" name="val" placeholder="Укажите значение" required pattern="^\d{1,2}(?:[,.]\d{1,3}|$)$">
+  </div>
+</div>
+<!-- 5 -->
+<hr/>
+<div class="elem0">
+  <div class="left_col">
+    <label for="max_stroke" title="от 0 до 5000 мм">MAX положение гидроцилидра, мм</label>
+  </div>
+  <div class="right_col">
+    <input type="text" id="max_stroke" name="val" placeholder="Укажите значение" required pattern="\d{1,4}" >
+  </div>
+</div>
+<!-- 6 -->
+<div class="elem0">
+  <div class="left_col">
+    <label for="adc_max_stroke" title="от 0 до 10 В">Напряжение при MAX положении гидроцилидра, В</label>
+  </div>
+  <div class="right_col">
+    <input type="text" id="adc_max_stroke" name="val" placeholder="Укажите значение" required pattern="^\d{1,2}(?:[,.]\d{1,3}|$)$">
+  </div>
+</div>
+<!-- 7 -->
+<hr/>
+<div class="elem0">
+  <div class="left_col">
+    <label for="zero_offset" title="от -99 до 99 мм">Значение смещения нулевого положения гидроцилидра, мм</label>
+  </div>
+  <div class="right_col">
+    <input type="text" id="zero_offset" name="val" placeholder="Укажите значение" required pattern="^-?\d{1,2}$">
+  </div>
+</div>
+<!-- 8 -->
+<hr/>
+<div class="elem0">
+  <div class="left_col">
+    <label for="debounce_in" title="от 100 до 9999 мс">Время фильтрации сигнала запуска, мс</label>
+  </div>
+  <div class="right_col">
+    <input type="text" id="debounce_in" name="val" placeholder="Укажите значение" required pattern="^\d{3,4}$">
+  </div>
+</div>
+<!-- 9 -->
+<hr/>
+<div class="elem0">
+  <div class="left_col">
+    <label for="delay_out" title="от 1000 до 60000 мс">Время стабилизации сигнала разрешения, мс</label>
+  </div>
+  <div class="right_col">
+    <input type="text" id="delay_out" name="val" placeholder="Укажите значение" required pattern="^\d{4,5}$">
+  </div>
+</div>
+<!-- 10 -->
+<hr/>
+</div>
+
+
+<div style="width:100%;">
+  <input type="button" id="save" onclick="SendSettings()" value="Сохранить">
+<!-- 
+  <input type="button" id="savefile" onclick="SaveFile()" value="Сохранить в файл">
+  <input type="file" accept=".json" id="fileinput" onclick="LoadFile()">
+-->
+  <hr/>
+</div>
+<div id="notice"></div>
+<script src="tuning.js"></script>
+</body>
+
+<script>
+
+</script>
+</html>

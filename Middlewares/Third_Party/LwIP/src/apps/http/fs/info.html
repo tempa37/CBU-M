@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style type="text/css">
+
+body, input, button, select {
+font-family: Georgia, Times, Times New Roman, sans-serif ;
+font-style: normal;
+font-size: 15px;
+color: #1F2833;
+}
+input[type="text"] {
+width: 100%;
+box-sizing: border-box;
+}
+input[type="button"] {
+width: 150px;
+}
+input:invalid {
+background: #ffd8d8;
+}
+input:valid {
+background: #d8ffd8;
+}
+.hide {
+height: 0;
+transition: all 3s;
+display: none;
+}
+button {
+width: 150px;
+}
+.right_col {
+width: 40%;
+}
+.left_col {
+width: 60%;
+}
+.frame {
+display: none;
+width: 100%;
+}
+.pident {
+width: 100%;
+display: flex;
+justify-content: space-between;
+}
+.ident {
+text-align: center;
+background-color: #dff2ef;
+}
+.elem0 {
+display: flex;
+width: 100%;
+margin-bottom: 5px;
+margin-right: 0px;
+background-color: #dff2ef;
+}
+</style>
+<title>Web конфигуратор</title>
+</head>
+
+<body style="width:640px;">
+
+<div id="usk" style="width:100%;">
+<hr/>
+<div class="pident">
+<div id="version" class="ident">Версия ПО 0.0.0</div>
+<div id="serial" class="ident">Серийный № 0000</div>
+<div id="mac" class="ident">MAC 00:10:A1:72:00:00</div>
+<div id="uptime" class="ident">000 д 00 ч 00 м 00 c</div>
+</div>
+<hr/>
+<!-- 0 -->
+<div class="elem0">
+<div class="left_col">
+</div>
+<div class="right_col">
+<div style="text-align:center;">Магистраль</div>
+</div>
+</div>
+
+<div class="elem0">
+<div class="left_col">
+<label for="sen1s">Статус</label>
+</div>
+<div class="right_col">
+<input type="text" id="sen1s" name="status" placeholder="Статус" required>
+</div>
+</div>
+<!-- 1 -->
+<div class="elem0">
+<div class="left_col">
+<label for="sen1">Давление</label>
+</div>
+<div class="right_col">
+<input type="text" id="sen1" name="pressure" placeholder="Значение" required >
+</div>
+</div>
+<hr/>
+<!-- 2 -->
+<div class="elem0">
+<div class="left_col">
+</div>
+<div class="right_col">
+<div style="text-align:center;">Гидроцилиндр</div>
+</div>
+</div>
+
+<div class="elem0">
+<div class="left_col">
+<label for="sen2s">Статус</label>
+</div>
+<div class="right_col">
+<input type="text" id="sen2s" name="status" placeholder="Статус" required >
+</div>
+</div>
+<!-- 3 -->
+<div class="elem0">
+<div class="left_col">
+<label for="sen2max">MAX</label>
+</div>
+<div class="right_col">
+<input type="text" id="sen2max" name="max" placeholder="Верхний порог" required >
+</div>
+</div>
+<!-- 4 -->
+<div class="elem0">
+<div class="left_col">
+<label for="sen2">Давление</label>
+</div>
+<div class="right_col">
+<input type="text" id="sen2" name="pressure" placeholder="Значение" required >
+</div>
+</div>
+<!-- 5 -->
+<div class="elem0">
+<div class="left_col">
+<label for="sen2min">MIN</label>
+</div>
+<div class="right_col">
+<input type="text" id="sen2min" name="min" placeholder="Нижний порог" required >
+</div>
+</div>
+<!-- 6 -->
+<hr/>
+</div>
+
+
+<div id="frame3" class="frame" style="display: block;">
+<div class="elem0">
+<div class="left_col">
+</div>
+<div class="right_col">
+<div style="text-align:center;">УРМ</div>
+</div>
+</div>
+
+<!-- 14 -->
+<div class="elem0">
+<div class="left_col">
+<label for="urm">Статус</label>
+</div>
+<div class="right_col">
+<input type="text" id="urm" name="status" placeholder="Статус" required >
+</div>
+</div>
+<hr/>
+</div>
+
+<div id="frame4" class="frame" style="display: block;">
+<div class="elem0">
+<div class="left_col">
+
+</div>
+<div class="right_col">
+<div style="text-align:center;">УМВХ</div>
+</div>
+</div>
+
+<!-- 18 -->
+<div class="elem0">
+<div class="left_col">
+<label for="umvh">Статус</label>
+</div>
+<div class="right_col">
+<input type="text" id="umvh" name="status" placeholder="Статус" required >
+</div>
+</div>
+
+
+<hr/>
+</div>
+
+<div id="frame5" class="frame" style="display: block;">
+<div class="elem0">
+<div class="left_col">
+
+</div>
+<div class="right_col">
+<div style="text-align:center;">Аварийный стоп</div>
+</div>
+</div>
+
+<!-- 18 -->
+<div class="elem0">
+<div class="left_col">
+<label for="emer">Статус</label>
+</div>
+<div class="right_col">
+<input type="text" id="emer" name="status" placeholder="Статус" required >
+</div>
+</div>
+
+
+<hr/>
+</div>
+
+<div style="width:100%;">
+<!--<input type="button" id="save" onclick="SendSettings()" value="Сохранить">-->
+<!--<input type="button" id="savefile" onclick="SaveFile()" value="Сохранить в файл">-->
+<!--<input type="file" accept=".json" id="fileinput" onclick="LoadFile()">-->
+<!--<hr/>-->
+</div>
+<div id="notice"></div>
+<script src="index.js"></script>
+</body>
+
+<script>
+/*
+async function up() {
+	let count = 4;
+	for (let n = 1; n <= count; n++) {
+		let sel_button = document.getElementById(`button${n}`);
+		if (sel_button != null) {
+			document.getElementById(`button${n}`).addEventListener("click", function() {
+				let sel_frame = document.getElementById(`group${n}`);
+				sel_frame.classList.toggle("hide");
+				sel_button.innerHTML == "Спрятать" ? sel_button.innerHTML = "Показать" : sel_button.innerHTML = "Спрятать";
+			});
+			document.getElementById(`frame${n}`).style.display = "block";
+			let p = document.querySelector(`#group${n}`);
+			p.className = "hide";
+		}
+	}
+}
+up();
+*/
+
+async function get_info() {
+	try {
+		await fetch('/info.json')
+		.then(response => response.json())
+		.then(function(json) {
+			for (let keys of Object.keys(json)) {
+				if (keys == "sen2max" || keys == "sen2min") {
+				let res = parseFloat(json[keys]) / 100;
+					document.getElementById(keys).value = res.toFixed(1);
+				} else if (keys == "sen1s" || keys == "sen2s" ||  keys == "urm" || keys == "umvh") {
+					switch(parseInt(json[keys]))
+					{
+						case 1 : {
+							document.getElementById(keys).value = "OFFLINE";
+							break;
+						}
+						case 2 : {
+							document.getElementById(keys).value = "ONLINE";
+							break;
+						}
+						case 4 : {
+							document.getElementById(keys).value = "Ниже MIN порога";
+							break;
+						}
+						case 5 : {
+							document.getElementById(keys).value = "НОРМА";
+							break;
+						}
+						case 6 : {
+							document.getElementById(keys).value = "Выше MAX порога";
+							break;
+						}
+						default :
+							break;
+					}
+				} else {
+					document.getElementById(keys).value = json[keys];
+				}
+			}
+			setTimeout(() => { get_info(); }, 1000);
+		});
+	} catch (error) {
+		console.log("Возникла проблема с запросом: ", error.name);
+		setTimeout(() => { get_info(); }, 1000);
+	}
+}
+
+window.onload = function() {
+	get_info();
+}
+</script>
+</html>

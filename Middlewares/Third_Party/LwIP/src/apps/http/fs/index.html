@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style type="text/css">
+
+body, input, button, select {
+font-family: Georgia, Times, Times New Roman, sans-serif ;
+font-style: normal;
+font-size: 15px;
+color: #1F2833;
+}
+input[type="text"] {
+width: 100%;
+box-sizing: border-box;
+}
+input[type="button"] {
+width: 150px;
+}
+input:invalid {
+background: #ffd8d8;
+}
+input:valid {
+background: #d8ffd8;
+}
+.hide {
+height: 0;
+transition: all 3s;
+display: none;
+}
+button {
+width: 150px;
+}
+.right_col {
+width: 40%;
+}
+.left_col {
+width: 60%;
+}
+.frame {
+display: none;
+width: 100%;
+}
+.pident {
+width: 100%;
+display: flex;
+justify-content: space-between;
+}
+.ident {
+text-align: center;
+background-color: #dff2ef;
+}
+.elem0 {
+display: flex;
+width: 100%;
+margin-bottom: 5px;
+margin-right: 0px;
+background-color: #dff2ef;
+}
+</style>
+<title>Web конфигуратор</title>
+</head>
+
+<body style="width:640px;">
+
+<div id="usk" style="width:100%;">
+<hr/>
+<div class="pident">
+<div id="version" class="ident">Версия ПО 0.0.0</div>
+<div id="serial" class="ident">Серийный № 0000</div>
+<div id="mac" class="ident">MAC 00:10:A1:72:00:00</div>
+<div id="uptime" class="ident">000 д 00 ч 00 м 00 c</div>
+</div>
+<hr/>
+<!-- 0 -->
+<div class="elem0">
+<div class="left_col">
+<label for="usk_ip">IP адрес устройства (192.168.72.70)</label>
+</div>
+<div class="right_col">
+<input type="text" id="usk_ip" name="ip" placeholder="Укажите IP" required>
+</div>
+</div>
+<!-- 1 -->
+<div class="elem0">
+<div class="left_col">
+<label for="usk_mask">Маска подсети (255.255.255.0)</label>
+</div>
+<div class="right_col">
+<input type="text" id="usk_mask" name="ip" placeholder="Укажите IP" required >
+</div>
+</div>
+<!-- 2 -->
+<div class="elem0">
+<div class="left_col">
+<label for="usk_gateway">Адрес шлюза (192.168.72.1)</label>
+</div>
+<div class="right_col">
+<input type="text" id="usk_gateway" name="ip" placeholder="Укажите IP" required >
+</div>
+</div>
+<!-- 3 -->
+<div class="elem0">
+<div class="left_col">
+<label for="self_id">Slave Modbus адрес (1) [1-247]</label>
+</div>
+<div class="right_col">
+<input type="text" id="self_id" name="id" placeholder="Укажите ID" required >
+</div>
+</div>
+<!-- 4 -->
+<div class="elem0">
+<div class="left_col">
+<label for="mb_rate">Время между опросом, мс</label>
+</div>
+<div class="right_col">
+<input type="text" id="mb_rate" name="port" placeholder="Укажите время" required pattern="\d{1,5}" >
+</div>
+</div>
+<!-- 5 -->
+<div class="elem0">
+<div class="left_col">
+<label for="mb_timeout">Время ожидания ответа, мс</label>
+</div>
+<div class="right_col">
+<input type="text" id="mb_timeout" name="port" placeholder="Укажите время" required pattern="\d{1,5}" >
+</div>
+</div>
+<!-- 6 -->
+<hr/>
+</div>
+
+<div id="frame1" class="frame" style="display: block;">
+<div class="elem0">
+<div class="left_col">
+<button id="button1">Показать</button>
+</div>
+<div class="right_col">
+<div style="text-align:center;">Датчики давления</div>
+</div>
+</div>
+<div id="group1" class="hide">
+<!-- 6 -->
+<div class="elem0">
+<div class="left_col">
+<label for="sens1_id">Modbus адрес "Магистраль" [1-247]</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens1_id" name="id" placeholder="Укажите ID" required >
+</div>
+</div>
+<!-- 7 -->
+<div class="elem0">
+<div class="left_col">
+<label for="sens2_id">Modbus адрес "Цилиндр" [1-247]</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens2_id" name="id" placeholder="Укажите ID" required >
+</div>
+</div>
+<!-- 8 -->
+<div class="elem0">
+<div class="left_col">
+<label for="sens2_min_val">Рабочий диапазон давления от, МПа</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens2_min_val" name="val" placeholder="Укажите величину" required >
+</div>
+</div>
+<!-- 9 -->
+<div class="elem0">
+<div class="left_col">
+<label for="sens2_max_val">Рабочий диапазон давления до, МПа</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens2_max_val" name="val" placeholder="Укажите величину" required >
+</div>
+</div>
+<!-- 10 -->
+</div>
+<hr/>
+</div>
+<!--
+<div id="frame2" class="frame" style="display: none;">
+<div class="elem0">
+<div class="left_col">
+<button id="button2">Показать</button>
+</div>
+<div class="right_col">
+<div style="text-align:center;">Датчик перемещения</div>
+</div>
+</div>
+<div id="group2" class="hide">
+
+<div class="elem0">
+<div class="left_col">
+<label for="sens3_min_lim">Минимальное положение штока, мм</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens3_min_lim" name="val" placeholder="Укажите величину" required >
+</div>
+</div>
+
+<div class="elem0">
+<div class="left_col">
+<label for="sens3_max_lim">Максимальное положение штока, мм</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens3_max_lim" name="val" placeholder="Укажите величину" required >
+</div>
+</div>
+
+<div class="elem0">
+<div class="left_col">
+<label for="sens3_min_val">Рабочий диапазон штока от, мм</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens3_min_val" name="val" placeholder="Укажите величину" required >
+</div>
+</div>
+
+<div class="elem0">
+<div class="left_col">
+<label for="sens3_max_val">Рабочий диапазон штока до, мм</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens3_max_val" name="val" placeholder="Укажите величину" required >
+</div>
+</div>
+
+</div>
+<hr/>
+</div>
+-->
+
+<div id="frame3" class="frame" style="display: block;">
+<div class="elem0">
+<div class="left_col">
+<button id="button3">Показать</button>
+</div>
+<div class="right_col">
+<div style="text-align:center;">УРМ</div>
+</div>
+</div>
+<div id="group3" class="hide">
+<!-- 14 -->
+<div class="elem0">
+<div class="left_col">
+<label for="urm_id">Modbus адрес (2) [1-8]</label>
+</div>
+<div class="right_col">
+<input type="text" id="urm_id" name="id" placeholder="Укажите ID" required >
+</div>
+</div>
+<!-- 14 -->
+<div class="elem0">
+<div class="left_col">
+<label for="valve1_io">Выход "Клапан 1" &#8593; [1-8]</label>
+</div>
+<div class="right_col">
+<input type="text" id="valve1_io" name="inout" placeholder="Укажите номер" required >
+</div>
+</div>
+<!-- 15 -->
+<div class="elem0">
+<div class="left_col">
+<label for="valve2_io">Выход "Клапан 2" &#8595; [1-8]</label>
+</div>
+<div class="right_col">
+<input type="text" id="valve2_io" name="inout" placeholder="Укажите номер" required >
+</div>
+</div>
+<!-- 16 -->
+<div class="elem0">
+<div class="left_col">
+<label for="state_out_io">Выход "Состояние системы" [1-8]</label>
+</div>
+<div class="right_col">
+<input type="text" id="state_out_io" name="inout" placeholder="Укажите номер" required >
+</div>
+</div>
+<!-- 17 -->
+</div>
+<hr/>
+</div>
+
+<div id="frame4" class="frame" style="display: block;">
+<div class="elem0">
+<div class="left_col">
+<button id="button4">Показать</button>
+</div>
+<div class="right_col">
+<div style="text-align:center;">УМВХ</div>
+</div>
+</div>
+<div id="group4" class="hide">
+<!-- 18 -->
+<div class="elem0">
+<div class="left_col">
+<label for="umvh_id">Modbus адрес (1) [1-8]</label>
+</div>
+<div class="right_col">
+<input type="text" id="umvh_id" name="id" placeholder="Укажите ID" required >
+</div>
+</div>
+<!-- 19 -->
+<!--
+<div class="elem0">
+<div class="left_col">
+<label for="sens3_io">Вход "Датчик перемещения" [1-8]</label>
+</div>
+<div class="right_col">
+<input type="text" id="sens3_io" name="inout" placeholder="Укажите номер" required >
+</div>
+</div>
+-->
+<!-- 20 -->
+<div class="elem0">
+<div class="left_col">
+<label for="state_in_io">Вход "Сигнал запуска" [1-8]</label>
+</div>
+<div class="right_col">
+<input type="text" id="state_in_io" name="inout" placeholder="Укажите номер" required >
+</div>
+</div>
+</div>
+<hr/>
+</div>
+
+<div style="width:100%;">
+<input type="button" id="save" onclick="SendSettings()" value="Сохранить">
+<input type="button" id="savefile" onclick="SaveFile()" value="Сохранить в файл">
+<input type="file" accept=".json" id="fileinput" onclick="LoadFile()">
+<hr/>
+</div>
+<div id="notice"></div>
+<script src="index.js"></script>
+</body>
+
+<script>
+async function up() {
+	let count = 4;
+	for (let n = 1; n <= count; n++) {
+		let sel_button = document.getElementById(`button${n}`);
+		if (sel_button != null) {
+			document.getElementById(`button${n}`).addEventListener("click", function() {
+				let sel_frame = document.getElementById(`group${n}`);
+				sel_frame.classList.toggle("hide");
+				sel_button.innerHTML == "Спрятать" ? sel_button.innerHTML = "Показать" : sel_button.innerHTML = "Спрятать";
+			});
+			document.getElementById(`frame${n}`).style.display = "block";
+			let p = document.querySelector(`#group${n}`);
+			p.className = "hide";
+		}
+	}
+}
+up();
+window.onload = function() {
+	State1();
+}
+</script>
+</html>

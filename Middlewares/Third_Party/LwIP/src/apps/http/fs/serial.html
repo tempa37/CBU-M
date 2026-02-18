@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style type="text/css">
+
+body, input, button, select {
+font-family: Georgia, Times, Times New Roman, sans-serif ;
+font-style: normal;
+font-size: 15px;
+color: #1F2833;
+}
+
+input[type="text"] {
+width: 100%;
+box-sizing: border-box;
+}
+input[type="button"] {
+width: 150px;
+}
+input:invalid {
+background: #ffd8d8;
+}
+input:valid {
+background: #d8ffd8;
+}
+
+button {
+width: 150px;
+}
+
+.elem0 {
+display: flex;
+width: 100%;
+margin-bottom: 5px;
+margin-right: 0px;
+background-color: #dff2ef;
+justify-content: center;
+}
+</style>
+
+<title>Web конфигуратор</title>
+</head>
+<body>
+<div id="main" style="width: 640px;">
+<h2 style="text-align: center;"> Идентификационные параметры устройства</h2>
+<hr/>
+
+<div class="elem0">
+<div style="width: 50%">
+MAC-адрес [ 00:10:A1:71: ]
+</div>
+<div style=" width: 50%; display: flex; column-gap:5px;  ">
+<input type="text" id="mac1" name="mac1" value="00" size="2" required pattern="^([0-9a-fA-F]{2})$"></input>
+<span>:</span>
+<input type="text" id="mac0" name="mac0" value="00" size="2" required pattern="^([0-9a-fA-F]{2})$"></input>
+</div>
+</div>
+
+<div class="elem0">
+<div style="width: 50%">
+Серийный номер
+</div>
+<div style="width: 50%">
+<input type="text" id="serial" name="sn" value="0001" size="11" required pattern="^([0-9]{4})$"></input>
+</div>
+</div>
+<div style="width: 640px;">
+<hr/>
+<strong style="color:red;">Предупреждение: устройство будет перезагружено после применения настроек!</strong>
+<hr/>
+<input type="button" id="save" onclick="Send()" value="Применить">
+</div>
+</div>
+<div id="notice"></div>
+</body>
+
+<script>
+
+function n(num, len) {
+return `${num}`.padStart(len, '0');
+}
+
+async function Set(myObj) {
+document.getElementById("serial").value = n(myObj.serial, 4);
+document.getElementById("mac0").value = n(myObj.mac0, 2);
+document.getElementById("mac1").value = n(myObj.mac1, 2);
+}
+
+async function Start() {
+let xhr = new XMLHttpRequest();
+xhr.open("GET", "/serial.json");
+xhr.responseType = "json";
+xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+xhr.timeout = 10000;
+xhr.onload = function() {
+if (xhr.status != 200) {
+console.log("No response received (01)");
+console.log("Error "+xhr.status+":"+xhr.statusText);
+} else {
+console.log("Response received (01)");
+let responseObj = xhr.response;
+Set(responseObj).then(window.sessionStorage.setItem("serial", JSON.stringify(responseObj)));
+}
+};
+xhr.onerror = function() {
+console.log("Request failed (01)");
+};
+xhr.send();
+delete xhr;
+}
+
+function Send() {
+document.getElementById("save").disabled = true;
+let mac_pattern = "^([0-9a-fA-F]{2})$";
+let re = new RegExp(mac_pattern);
+let validate_status = 0;
+let myObj = JSON.parse(window.sessionStorage.getItem("serial"));
+
+let s = document.getElementById("serial").value;
+if (/^([0-9]{4})$/.test(s)){
+myObj.serial = s;
+} else {
+validate_status++;
+}
+let mac0 = document.getElementById("mac0").value;
+if (!re.test(mac0)) {
+validate_status++;
+} else {
+myObj.mac0 = mac0;
+}
+let mac1 = document.getElementById("mac1").value;
+if (!re.test(mac1)) {
+validate_status++;
+} else {
+myObj.mac1 = mac1;
+}
+if (validate_status > 0) {
+document.getElementById("save").disabled = false;
+document.getElementById("notice").textContent = "При валидации данных произошла ошибка. Проверте параметры.";
+//alert("При валидации данных произошла ошибка");
+} else {
+let xhr = new XMLHttpRequest();
+xhr.open("POST", "/serial", true);
+xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+xhr.timeout = 10000;
+xhr.onload = function() {
+if (xhr.status != 200) {
+document.getElementById("save").disabled = false;
+console.log("Parameters not saved.");
+console.log("Error "+xhr.status+":"+xhr.statusText);
+document.getElementById("notice").textContent = "Параметры не сохранены.";
+} else {
+console.log("Parameters saved.");
+document.getElementById("notice").textContent = "Параметры сохранены.";
+setTimeout(function() { window.location.href = '/';}, 10000);
+}
+};
+xhr.onerror = function() {
+console.log("Request failed (02)");
+};
+xhr.setRequestHeader("Content-Type","application/json; charset=utf-8");
+let data = JSON.stringify(myObj);
+xhr.send(data);
+delete xhr;
+}
+}
+Start();
+</script>
+</html>

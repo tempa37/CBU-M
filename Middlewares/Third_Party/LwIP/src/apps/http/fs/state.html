@@ -1,0 +1,190 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style type="text/css">
+.elem0 {
+display: flex;
+width: 100%;
+margin-bottom: 5px;
+margin-right: 0px;
+background-color: #dff2ef;
+}
+.pident {
+width: 100%;
+display: flex;
+justify-content: space-between;
+background-color: #dff2ef;
+}
+</style>
+<title>Web конфигуратор</title>
+</head>
+<body style="width: 640px;">
+<div>
+Настройка действий при срабатывании порогов по температуре
+</div>
+<hr/>
+<div>
+(величина порога 1) &gt; (величина порога 2) &gt; (величина порога 3) &gt; (величина порога 4)
+</div>
+<hr/>
+<div id="threshold1" class="pident">
+<div>Выполнить если ниже порога 1</div>
+<div style="width: 45%; text-align:center;">
+Сброс состояния
+</div>
+</div>
+<br>
+<div id="threshold2" class="pident">
+<div>Выполнить если выше порога 2</div>
+<div style="width: 45%; display: flex; justify-content: space-between;">
+<select id="th0_act1" name="extinction">
+<option value="on">Тушение ВКЛ</option>
+<option value="off" selected>Тушение ВЫКЛ</option>
+</select>
+<div>И</div>
+<select id="th0_act2" name="transporter">
+<option value="on">Конвейер ВКЛ</option>
+<option value="off">Конвейер ВЫКЛ</option>
+</select>
+</div>
+</div>
+<br>
+<div id="threshold3" class="pident">
+<div>Выполнить если выше порога 3</div>
+<div style="width: 45%; display: flex; justify-content: space-between;">
+<select id="th1_act1" name="extinction">
+<option value="on">Тушение ВКЛ</option>
+<option value="off">Тушение ВЫКЛ</option>
+</select>
+<div>И</div>
+<select id="th1_act2" name="transporter">
+<option value="on">Конвейер ВКЛ</option>
+<option value="off">Конвейер ВЫКЛ</option>
+</select>
+</div>
+</div>
+<br>
+<div id="threshold4" class="pident">
+<div>Выполнить если выше порога 4</div>
+<div style="width: 45%; display: flex; justify-content: space-between;">
+<select id="th2_act1" name="extinction">
+<option value="on">Тушение ВКЛ</option>
+<option value="off">Тушение ВЫКЛ</option>
+</select>
+<div>И</div>
+<select id="th2_act2" name="transporter">
+<option value="on">Конвейер ВКЛ</option>
+<option value="off" selected>Конвейер ВЫКЛ</option>
+</select>
+</div>
+</div>
+<br>
+<hr/>
+<div id="line" class="pident">
+<div>Выполнить если обрыв контура</div>
+<div style="width: 45%; display: flex; justify-content: space-between;">
+<select id="th3_act1" name="extinction">
+<option value="on">Тушение ВКЛ</option>
+<option value="off">Тушение ВЫКЛ</option>
+</select>
+<div>И</div>
+<select id="th3_act2" name="transporter">
+<option value="on">Конвейер ВКЛ</option>
+<option value="off">Конвейер ВЫКЛ</option>
+</select>
+</div>
+</div>
+<hr/>
+<div>
+<input type="button" id="save" onclick="SendSettings()" value="Сохранить">
+</div>
+<hr/>
+<div id="notice"></div>
+</body>
+<script>
+function SendSettings() {
+document.getElementById("save").disabled = true;
+let myObj = JSON.parse(window.sessionStorage.getItem("state"));
+for (let i = 0; i<4; i++) {
+let el_1 = document.getElementById("th"+i+"_act1").value;
+let el_2 = document.getElementById("th"+i+"_act2").value;
+if (el_1 == "on") {
+myObj.state[i].e = 1;
+} else {
+myObj.state[i].e = 0;
+}
+if (el_2 == "on") {
+myObj.state[i].t = 1;
+} else {
+myObj.state[i].t = 0;
+}
+}
+let data = JSON.stringify(myObj);
+let xhr = new XMLHttpRequest();
+xhr.open("POST", "/threshold", true);
+xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+xhr.setRequestHeader("Content-Type","application/json; charset=utf-8");
+xhr.timeout = 10000;
+xhr.onload = function() {
+if (xhr.status != 200) {
+document.getElementById("notice").textContent = "Настройки не сохранены.";
+console.log("Settings data not transferred.");
+console.log(xhr.status + " : " + xhr.statusText);
+document.getElementById("save").disabled = false;
+} else {
+document.getElementById("notice").textContent = "Настройки сохранены.";
+setTimeout(function() { window.location.href = '/';}, 10000);
+console.log("Settings data transferred.");
+}
+};
+xhr.onerror = function() {
+console.log("Request failed");
+};
+xhr.send(data);
+delete xhr;
+console.log(myObj);
+}
+function loadSettings() {
+let xhr = new XMLHttpRequest();
+xhr.open("GET", "/state.json");
+xhr.responseType = "json";
+xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+xhr.timeout = 10000;
+xhr.onload = function() {
+if (xhr.status != 200) {
+console.log("No response received");
+console.log(xhr.status + " : " + xhr.statusText);
+} else {
+console.log("Response received");
+let resp = xhr.response;
+window.sessionStorage.setItem("state", JSON.stringify(resp));
+for (let i = 0; i<4; i++) {
+let op1 = document.getElementById("th"+i+"_act1");
+let op2 = document.getElementById("th"+i+"_act2");
+if (resp.state[i].e == 1) {
+op1.options[0].selected = true;
+} else {
+op1.options[1].selected = true;
+}
+
+if (resp.state[i].t == 1) {
+op2.options[0].selected = true;
+} else {
+op2.options[1].selected = true;
+}
+}
+}
+};
+xhr.onerror = function() {
+console.log("Request failed");
+};
+xhr.send();
+delete xhr;
+}
+loadSettings();
+</script>
+</html>

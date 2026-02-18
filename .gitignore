@@ -1,0 +1,57 @@
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.bat
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+*.bin
+
+# Debug files
+Debug/
+out/
+project/settings/
+
+.cache/
+BrowseInfo/
+Exe/
+List/
+Obj/
+*.json
+.ninja*
+EWARM/settings/
+
+*.project_build_cache
+*.bak
+
+
+Backup*.ewd
+Backup*.ewp
+Backup*.ewt
+
+msvcr100d.dll
+makefsdata.exe
+makefs.bat
