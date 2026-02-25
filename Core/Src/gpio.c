@@ -46,8 +46,6 @@ void MX_GPIO_Init(void) {
   
   // RESET
   {
-    HAL_GPIO_WritePin(GPIOD, CON_1_Pin|CON_2_Pin, GPIO_PIN_RESET);
-    
     //HAL_GPIO_WritePin(GPIOE, BDU1_M_S_Pin|BDU2_M_S_Pin, GPIO_PIN_RESET);
     
     HAL_GPIO_WritePin(GPIOE, PWR_KTV_Pin|OLED_DC_Pin|OLED_CS_Pin|OLED_RST_Pin, GPIO_PIN_RESET);
@@ -89,7 +87,7 @@ void MX_GPIO_Init(void) {
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(WDI_GPIO_Port, &GPIO_InitStruct);
     
-    GPIO_InitStruct.Pin = STM_LOOP_LINK_Pin|CON_1_Pin|CON_2_Pin|ANA_RELE_2_Pin;
+    GPIO_InitStruct.Pin = STM_LOOP_LINK_Pin|ANA_RELE_2_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -134,7 +132,7 @@ void MX_GPIO_Init(void) {
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
     
-    GPIO_InitStruct.Pin = MCU_BLK_1_2_Pin|MCU_BLK_2_1_Pin|MCU_BLK_2_2_Pin|CON_ON_OFF_Pin;
+    GPIO_InitStruct.Pin = MCU_BLK_1_2_Pin|MCU_BLK_2_1_Pin|MCU_BLK_2_2_Pin|CON_ON_OFF_Pin|CON_1_Pin|CON_2_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
