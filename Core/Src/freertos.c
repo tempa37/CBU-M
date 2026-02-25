@@ -39,6 +39,7 @@
 #include "keyboard.h"
 
 #include "manage_settings.h"
+#include "ring_line.h"
 
 /* USER CODE END Includes */
 
@@ -115,6 +116,13 @@ const osThreadAttr_t main_task_handle_attr = {
   .name = "Main",
   .stack_size = 128 * 12,
   .priority = (osPriority_t) osPriorityNormal,
+};
+
+osThreadId_t ring_line_task_handle;
+const osThreadAttr_t ring_line_task_handle_attr = {
+  .name = "RingLine",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
 };
 //
 osThreadId_t defaultTaskHandle;
@@ -220,6 +228,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 static void startDefaultTask(void *argument);
 static void wdi_thread(void *argument);
 static void main_task_thread(void *argument);
+static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
 //void delayed_start_callback(void *argument);
@@ -310,6 +319,7 @@ void MX_FREERTOS_Init(void) {
   modbus_rtu_start();
 
   main_task_handle = osThreadNew(main_task_thread, NULL, &main_task_handle_attr);
+  ring_line_task_handle = osThreadNew(ring_line_thread, NULL, &ring_line_task_handle_attr);
 }
 
 /**
@@ -1138,3 +1148,11 @@ void delayed_start_callback(void *argument) {
   switch_state = 1;
 }
 */
+static void ring_line_thread(void *argument) {
+  (void) argument;
+
+  while (1) {
+    ring_line_process_task_step();
+    osDelay(500);
+  }
+}

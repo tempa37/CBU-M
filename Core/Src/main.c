@@ -31,6 +31,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "version.h"
+#include "ring_line.h"
 
 /* USER CODE END Includes */
 
@@ -111,6 +112,7 @@ int main(void) {
   MX_USART3_UART_Init();
   MX_TIM12_Init();
   MX_TIM14_Init();
+  Start_IT_TIM12();
   
   //MX_RTC_Init();
   
@@ -188,6 +190,10 @@ void SystemClock_Config(void) {
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   if (htim->Instance == TIM1) {
     HAL_IncTick();
+  } else if (htim->Instance == TIM12) {
+    uint8_t ring_line_1 = (uint8_t)HAL_GPIO_ReadPin(CON_2_Port, CON_2_Pin);
+    uint8_t ring_line_2 = (uint8_t)HAL_GPIO_ReadPin(CON_1_Port, CON_1_Pin);
+    ring_line_capture_isr(ring_line_1, ring_line_2);
   }
 }
 
