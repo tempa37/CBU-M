@@ -5,29 +5,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style type="text/css">
-
 body, input, button, select {
-font-family: Georgia, Times, Times New Roman, sans-serif ;
+font-family: Georgia, Times, Times New Roman, sans-serif;
 font-style: normal;
 font-size: 15px;
 color: #1F2833;
+}
+body {
+width: 640px;
+margin: 0 auto;
+text-align: center;
 }
 input[type="text"] {
 width: 100%;
 box-sizing: border-box;
 }
-input[type="button"] {
-width: 150px;
-}
-input:invalid {
-background: #ffd8d8;
-}
-input:valid {
-background: #d8ffd8;
-}
 .hide {
 height: 0;
-transition: all 3s;
+transition: all 0.3s;
 display: none;
 }
 button {
@@ -40,30 +35,59 @@ width: 40%;
 width: 60%;
 }
 .frame {
-display: none;
+display: block;
 width: 100%;
 }
 .pident {
 width: 100%;
 display: flex;
-justify-content: space-between;
+justify-content: center;
+gap: 8px;
 }
 .ident {
 text-align: center;
 background-color: #dff2ef;
+padding: 4px 8px;
 }
 .elem0 {
 display: flex;
 width: 100%;
 margin-bottom: 5px;
-margin-right: 0px;
+background-color: #dff2ef;
+justify-content: center;
+align-items: center;
+}
+.test-firmware {
+color: #cf0000;
+font-weight: bold;
+font-size: 24px;
+text-align: center;
+margin: 10px 0;
+}
+.oled-struct {
+display: flex;
+flex-direction: column;
+align-items: center;
+padding: 8px;
 background-color: #dff2ef;
 }
+.oled-row {
+display: flex;
+justify-content: space-between;
+gap: 16px;
+width: 100%;
+max-width: 620px;
+padding: 3px 0;
+border-bottom: 1px solid #cde7e3;
+}
+.oled-key { font-weight: bold; }
+.oled-comment { font-style: italic; text-align: right; }
 </style>
 <title>Web конфигуратор</title>
 </head>
 
-<body style="width:640px;">
+<body>
+<div class="test-firmware">ТЕСТОВАЯ ПРОШИВКА</div>
 
 <div id="usk" style="width:100%;">
 <hr/>
@@ -74,221 +98,86 @@ background-color: #dff2ef;
 <div id="uptime" class="ident">000 д 00 ч 00 м 00 c</div>
 </div>
 <hr/>
-<!-- 0 -->
-<div class="elem0">
-<div class="left_col">
-</div>
-<div class="right_col">
-<div style="text-align:center;">Магистраль</div>
-</div>
-</div>
 
-<div class="elem0">
-<div class="left_col">
-<label for="sen1s">Статус</label>
-</div>
-<div class="right_col">
-<input type="text" id="sen1s" name="status" placeholder="Статус" required>
-</div>
-</div>
-<!-- 1 -->
-<div class="elem0">
-<div class="left_col">
-<label for="sen1">Давление</label>
-</div>
-<div class="right_col">
-<input type="text" id="sen1" name="pressure" placeholder="Значение" required >
-</div>
-</div>
+<div class="elem0"><div class="left_col"></div><div class="right_col"><div>Магистраль</div></div></div>
+<div class="elem0"><div class="left_col"><label for="sen1s">Статус</label></div><div class="right_col"><input type="text" id="sen1s" name="status" required></div></div>
+<div class="elem0"><div class="left_col"><label for="sen1">Давление</label></div><div class="right_col"><input type="text" id="sen1" name="pressure" required></div></div>
 <hr/>
-<!-- 2 -->
-<div class="elem0">
-<div class="left_col">
-</div>
-<div class="right_col">
-<div style="text-align:center;">Гидроцилиндр</div>
-</div>
-</div>
 
-<div class="elem0">
-<div class="left_col">
-<label for="sen2s">Статус</label>
-</div>
-<div class="right_col">
-<input type="text" id="sen2s" name="status" placeholder="Статус" required >
-</div>
-</div>
-<!-- 3 -->
-<div class="elem0">
-<div class="left_col">
-<label for="sen2max">MAX</label>
-</div>
-<div class="right_col">
-<input type="text" id="sen2max" name="max" placeholder="Верхний порог" required >
-</div>
-</div>
-<!-- 4 -->
-<div class="elem0">
-<div class="left_col">
-<label for="sen2">Давление</label>
-</div>
-<div class="right_col">
-<input type="text" id="sen2" name="pressure" placeholder="Значение" required >
-</div>
-</div>
-<!-- 5 -->
-<div class="elem0">
-<div class="left_col">
-<label for="sen2min">MIN</label>
-</div>
-<div class="right_col">
-<input type="text" id="sen2min" name="min" placeholder="Нижний порог" required >
-</div>
-</div>
-<!-- 6 -->
+<div class="elem0"><div class="left_col"></div><div class="right_col"><div>Гидроцилиндр</div></div></div>
+<div class="elem0"><div class="left_col"><label for="sen2s">Статус</label></div><div class="right_col"><input type="text" id="sen2s" name="status" required></div></div>
+<div class="elem0"><div class="left_col"><label for="sen2max">MAX</label></div><div class="right_col"><input type="text" id="sen2max" name="max" required></div></div>
+<div class="elem0"><div class="left_col"><label for="sen2">Давление</label></div><div class="right_col"><input type="text" id="sen2" name="pressure" required></div></div>
+<div class="elem0"><div class="left_col"><label for="sen2min">MIN</label></div><div class="right_col"><input type="text" id="sen2min" name="min" required></div></div>
 <hr/>
 </div>
 
-
-<div id="frame3" class="frame" style="display: block;">
-<div class="elem0">
-<div class="left_col">
-</div>
-<div class="right_col">
-<div style="text-align:center;">УРМ</div>
-</div>
+<div id="frame3" class="frame">
+<div class="elem0"><div class="left_col"></div><div class="right_col"><div>УРМ</div></div></div>
+<div class="elem0"><div class="left_col"><label for="urm">Статус</label></div><div class="right_col"><input type="text" id="urm" name="status" required></div></div>
+<hr/>
 </div>
 
-<!-- 14 -->
+<div id="frame4" class="frame">
+<div class="elem0"><div class="left_col"></div><div class="right_col"><div>УМВХ</div></div></div>
+<div class="elem0"><div class="left_col"><label for="umvh">Статус</label></div><div class="right_col"><input type="text" id="umvh" name="status" required></div></div>
+<hr/>
+</div>
+
+<div id="frame5" class="frame">
+<div class="elem0"><div class="left_col"></div><div class="right_col"><div>Аварийный стоп</div></div></div>
+<div class="elem0"><div class="left_col"><label for="emer">Статус</label></div><div class="right_col"><input type="text" id="emer" name="status" required></div></div>
+<hr/>
+</div>
+
+<div id="frame6" class="frame">
 <div class="elem0">
-<div class="left_col">
-<label for="urm">Статус</label>
+<div class="left_col"><button id="button6">Показать</button></div>
+<div class="right_col"><div>Структура oled_msg</div></div>
 </div>
-<div class="right_col">
-<input type="text" id="urm" name="status" placeholder="Статус" required >
-</div>
+<div id="group6" class="hide">
+<div class="oled-struct" id="oled_struct_view"></div>
 </div>
 <hr/>
 </div>
 
-<div id="frame4" class="frame" style="display: block;">
-<div class="elem0">
-<div class="left_col">
-
-</div>
-<div class="right_col">
-<div style="text-align:center;">УМВХ</div>
-</div>
-</div>
-
-<!-- 18 -->
-<div class="elem0">
-<div class="left_col">
-<label for="umvh">Статус</label>
-</div>
-<div class="right_col">
-<input type="text" id="umvh" name="status" placeholder="Статус" required >
-</div>
-</div>
-
-
+<div id="frame7" class="frame">
+<div class="elem0"><div class="left_col"><label for="safety_contour">Контур безопасности</label></div><div class="right_col"><input type="text" id="safety_contour" name="status" value="неизвестно" readonly></div></div>
 <hr/>
 </div>
 
-<div id="frame5" class="frame" style="display: block;">
-<div class="elem0">
-<div class="left_col">
-
-</div>
-<div class="right_col">
-<div style="text-align:center;">Аварийный стоп</div>
-</div>
-</div>
-
-<!-- 18 -->
-<div class="elem0">
-<div class="left_col">
-<label for="emer">Статус</label>
-</div>
-<div class="right_col">
-<input type="text" id="emer" name="status" placeholder="Статус" required >
-</div>
-</div>
-
-
-<hr/>
-</div>
-
-<div style="width:100%;">
-<!--<input type="button" id="save" onclick="SendSettings()" value="Сохранить">-->
-<!--<input type="button" id="savefile" onclick="SaveFile()" value="Сохранить в файл">-->
-<!--<input type="file" accept=".json" id="fileinput" onclick="LoadFile()">-->
-<!--<hr/>-->
-</div>
 <div id="notice"></div>
 <script src="index.js"></script>
-</body>
 
 <script>
-/*
-async function up() {
-	let count = 4;
-	for (let n = 1; n <= count; n++) {
-		let sel_button = document.getElementById(`button${n}`);
-		if (sel_button != null) {
-			document.getElementById(`button${n}`).addEventListener("click", function() {
-				let sel_frame = document.getElementById(`group${n}`);
-				sel_frame.classList.toggle("hide");
-				sel_button.innerHTML == "Спрятать" ? sel_button.innerHTML = "Показать" : sel_button.innerHTML = "Спрятать";
-			});
-			document.getElementById(`frame${n}`).style.display = "block";
-			let p = document.querySelector(`#group${n}`);
-			p.className = "hide";
-		}
-	}
-}
-up();
-*/
-
 async function get_info() {
 	try {
 		await fetch('/info.json')
 		.then(response => response.json())
 		.then(function(json) {
 			for (let keys of Object.keys(json)) {
+				let elem = document.getElementById(keys);
+				if (!elem) {
+					continue;
+				}
 				if (keys == "sen2max" || keys == "sen2min") {
-				let res = parseFloat(json[keys]) / 100;
-					document.getElementById(keys).value = res.toFixed(1);
-				} else if (keys == "sen1s" || keys == "sen2s" ||  keys == "urm" || keys == "umvh") {
-					switch(parseInt(json[keys]))
-					{
-						case 1 : {
-							document.getElementById(keys).value = "OFFLINE";
-							break;
-						}
-						case 2 : {
-							document.getElementById(keys).value = "ONLINE";
-							break;
-						}
-						case 4 : {
-							document.getElementById(keys).value = "Ниже MIN порога";
-							break;
-						}
-						case 5 : {
-							document.getElementById(keys).value = "НОРМА";
-							break;
-						}
-						case 6 : {
-							document.getElementById(keys).value = "Выше MAX порога";
-							break;
-						}
-						default :
-							break;
+					let res = parseFloat(json[keys]) / 100;
+					elem.value = res.toFixed(1);
+				} else if (keys == "sen1s" || keys == "sen2s" || keys == "urm" || keys == "umvh") {
+					switch(parseInt(json[keys])) {
+						case 1: elem.value = "OFFLINE"; break;
+						case 2: elem.value = "ONLINE"; break;
+						case 4: elem.value = "Ниже MIN порога"; break;
+						case 5: elem.value = "НОРМА"; break;
+						case 6: elem.value = "Выше MAX порога"; break;
+						default: elem.value = json[keys]; break;
 					}
 				} else {
-					document.getElementById(keys).value = json[keys];
+					elem.value = json[keys];
 				}
 			}
+			renderOledStruct(json);
+			updateSafetyContour(json);
 			setTimeout(() => { get_info(); }, 1000);
 		});
 	} catch (error) {
@@ -297,8 +186,87 @@ async function get_info() {
 	}
 }
 
+function oledComment(path) {
+	const comments = {
+		"menu_id": "ID меню",
+		"value1": "Сервисное значение 1",
+		"value2": "Сервисное значение 2",
+		"value3": "Сервисное значение 3",
+		"value4": "Сервисное значение 4",
+		"value5": "Сервисное значение 5",
+		"pin_value": "PIN код (общее значение)",
+		"pin0": "PIN разряд 0",
+		"pin1": "PIN разряд 1",
+		"pin2": "PIN разряд 2",
+		"pin4": "PIN разряд 3",
+		"title": "Заголовок текущего меню",
+		"sub_title": "Подзаголовок текущего меню",
+		"pressure_sensor_mainline_state": "pressure_sensor[MAINLINE].state",
+		"pressure_sensor_mainline_value": "pressure_sensor[MAINLINE].value",
+		"pressure_sensor_mainline_min_value": "pressure_sensor[MAINLINE].min_value",
+		"pressure_sensor_mainline_max_value": "pressure_sensor[MAINLINE].max_value",
+		"pressure_sensor_hydraulic_state": "pressure_sensor[HYDRAULIC].state",
+		"pressure_sensor_hydraulic_value": "pressure_sensor[HYDRAULIC].value",
+		"pressure_sensor_hydraulic_min_value": "pressure_sensor[HYDRAULIC].min_value",
+		"pressure_sensor_hydraulic_max_value": "pressure_sensor[HYDRAULIC].max_value",
+		"valve_state": "valve.state",
+		"valve_value_out": "valve.value_out",
+		"valve_out_up": "valve.out_up",
+		"valve_out_down": "valve.out_down",
+		"emer": "emer_state",
+		"state_in": "state_in",
+		"state_out": "state_out",
+		"position": "position",
+		"position_state": "position_state",
+		"umvh": "umvh_state",
+		"urm": "urm_state",
+		"save_state": "save_state",
+		"system_control_mode": "system_control_mode",
+		"uptime": "Время работы (сек)",
+		"sen1": "Сокращенное: давление магистрали",
+		"sen1s": "Сокращенное: статус магистрали",
+		"sen2": "Сокращенное: давление гидроцилиндра",
+		"sen2s": "Сокращенное: статус гидроцилиндра",
+		"sen2min": "Порог min",
+		"sen2max": "Порог max"
+	};
+	return comments[path] || "Поле oled_msg / связанный статус";
+}
+
+function renderOledStruct(json) {
+	let container = document.getElementById("oled_struct_view");
+	if (!container) {
+		return;
+	}
+	container.innerHTML = "";
+	for (let [key, value] of Object.entries(json)) {
+		let row = document.createElement("div");
+		row.className = "oled-row";
+		row.innerHTML = `<span class="oled-key">${key}</span><span>${value}</span><span class="oled-comment">${oledComment(key)}</span>`;
+		container.appendChild(row);
+	}
+}
+
+function updateSafetyContour(json) {
+	const value = parseInt(json.emer);
+	let text = "неизвестно";
+	if (value === 0) {
+		text = "0";
+	} else if (value === 1) {
+		text = "1";
+	}
+	document.getElementById("safety_contour").value = text;
+}
+
 window.onload = function() {
+	let sel_button = document.getElementById("button6");
+	sel_button.addEventListener("click", function() {
+		let sel_frame = document.getElementById("group6");
+		sel_frame.classList.toggle("hide");
+		sel_button.innerHTML = (sel_button.innerHTML == "Спрятать") ? "Показать" : "Спрятать";
+	});
 	get_info();
 }
 </script>
+</body>
 </html>
