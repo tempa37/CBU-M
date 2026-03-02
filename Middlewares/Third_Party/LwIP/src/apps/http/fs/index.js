@@ -269,3 +269,88 @@ document.getElementById("sens3_io").value = settings_json.sens3_io;
 }
 document.getElementById("state_in_io").value = settings_json.state_in_io;
 }
+
+function runUartTest() {
+const button = document.getElementById("uart-test-button");
+if (button == null) {
+return;
+}
+
+button.disabled = true;
+
+let xhr = new XMLHttpRequest();
+xhr.open("POST", "/uart-test", true);
+xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+xhr.timeout = 3000;
+xhr.onload = function() {
+if (xhr.status != 200) {
+button.disabled = false;
+alert("Не удалось запустить UART тест");
+return;
+}
+
+let retries = 0;
+let timer = setInterval(function() {
+let poll = new XMLHttpRequest();
+poll.open("GET", "/uart_test.json", true);
+poll.responseType = "json";
+poll.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+poll.timeout = 1500;
+
+poll.onload = function() {
+if (poll.status != 200 || poll.response == null) {
+return;
+}
+
+let resp = poll.response;
+let state = parseInt(resp.state, 10);
+if (state === 3) {
+clearInterval(timer);
+button.disabled = false;
+
+let success = parseInt(resp.success, 10);
+let step = parseInt(resp.step, 10);
+let error = parseInt(resp.error, 10);
+let duration = 0;
+
+if (resp.started_tick != null && resp.finished_tick != null) {
+duration = parseInt(resp.finished_tick, 10) - parseInt(resp.started_tick, 10);
+if (duration < 0) {
+duration = 0;
+}
+}
+
+if (success === 1) {
+alert("UART тест пройден успешно. Шаг: " + step + ", время: " + duration + " мс");
+} else {
+alert("UART тест завершился с ошибкой. Код ошибки: " + error + ", шаг: " + step + ", время: " + duration + " мс");
+}
+}
+};
+
+poll.send();
+
+retries++;
+if (retries >= 20) {
+clearInterval(timer);
+button.disabled = false;
+alert("UART тест: не получен результат за отведенное время");
+}
+}, 1000);
+};
+
+xhr.onerror = function() {
+button.disabled = false;
+alert("Ошибка сети при запуске UART теста");
+};
+
+xhr.send("{}");
+}
+
+window.addEventListener("load", function() {
+const button = document.getElementById("uart-test-button");
+if (button != null) {
+button.addEventListener("click", runUartTest);
+}
+});

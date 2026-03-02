@@ -249,6 +249,43 @@ void status_sys(struct netconn *conn) {
   }
 }
 
+void uart_test_status(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    uart_test_result_t result = {0};
+
+    uart_test_get_result(&result);
+
+    memset(html, 0, HTML_LEN);
+    length_html = 0;
+    length_html += sprintf((char*)(html + length_html),
+      "{\"state\":\"%u\",\"success\":\"%u\",\"step\":\"%u\",\"error\":\"%u\",\"started_tick\":\"%lu\",\"finished_tick\":\"%lu\"}",
+      result.state,
+      result.success,
+      result.step,
+      result.error,
+      (unsigned long)result.started_tick,
+      (unsigned long)result.finished_tick);
+
+    send_response(conn);
+
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
+void uart_test_start(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    uart_test_request_start();
+
+    memset(html, 0, HTML_LEN);
+    length_html = 0;
+    length_html += sprintf((char*)(html + length_html), "{\"queued\":\"1\"}");
+
+    send_response(conn);
+
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
 /**
  * @brief initialization
  *
@@ -416,6 +453,8 @@ static int post_state_machine(struct netconn* conn, char* buf, u16_t buflen) {
         post_data.url = 3;
       } else if ((buflen >= 12) && (strncmp(buf, "POST /tuning", 12) == 0)) {
         post_data.url = 4;
+      } else if ((buflen >= 15) && (strncmp(buf, "POST /uart-test", 15) == 0)) {
+        post_data.url = 5;
       }
       if (post_data.url > 0) {
         ret = STATUS_ERROR;
@@ -765,6 +804,9 @@ static void http_server(struct netconn *conn) {
           else if (strncmp(buf, "GET /info.json", 14) == 0) {
             status_sys(conn);
           }
+          else if (strncmp(buf, "GET /uart_test.json", 19) == 0) {
+            uart_test_status(conn);
+          }
           else if (strncmp(buf, "GET /info.html", 14) == 0) {
             fs_open(&file, "/info.html");
             netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_NOCOPY);
@@ -1025,6 +1067,10 @@ static void http_server(struct netconn *conn) {
 
                   }
                 } // if (post_data.url == 4)
+
+                if (post_data.url == 5) {
+                  uart_test_start(conn);
+                }
               } // (ret == POST_STATUS_DONE)
             }
           }
