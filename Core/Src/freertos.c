@@ -219,6 +219,9 @@ modbusHandler_t ModbusTCPs;
 
 uint16_t ModbusDATA_Slave[64];
 
+#ifndef UART_TEST_API_DEFINED
+#define UART_TEST_API_DEFINED
+
 typedef struct {
   volatile uint8_t request;
   volatile uint8_t running;
@@ -248,6 +251,8 @@ uint8_t uart_test_get_status(uint8_t *running, uint8_t *done, uint8_t *success, 
   }
   return 1;
 }
+
+#endif
 
 static void uart_test_run(void);
 static uint8_t uart_test_transfer(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, GPIO_TypeDef *tx_en_port, uint16_t tx_en_pin, GPIO_TypeDef *rx_en_port, uint16_t rx_en_pin, uint8_t configure_rx_first);

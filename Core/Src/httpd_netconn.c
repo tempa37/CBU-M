@@ -249,6 +249,9 @@ void status_sys(struct netconn *conn) {
   }
 }
 
+#ifndef UART_TEST_HTTP_HANDLERS_DEFINED
+#define UART_TEST_HTTP_HANDLERS_DEFINED
+
 void uart_test_start(struct netconn *conn) {
   uart_test_request_start();
   if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
@@ -279,6 +282,8 @@ void uart_test_status(struct netconn *conn) {
     osSemaphoreRelease(httpdbufSemaphore);
   }
 }
+
+#endif
 
 void uart_test_start(struct netconn *conn) {
   uart_test_request_start();
