@@ -763,6 +763,10 @@ static void uart_test_run(void) {
 
   uart_test.done = 1;
   uart_test.running = 0;
+
+  // Восстановить штатный прием Modbus после теста.
+  ModbusStart(&ModbusRS2);
+  ModbusStart(&ModbusRS1);
 }
 
 /**
@@ -778,6 +782,45 @@ static void main_task_thread(void *argument) {
 #endif
   
   Menu_Navigate(&Menu_7);
+  
+  modbus_t telegram_sensor_pressure = {
+    // function code
+    .u8fct = MB_FC_READ_REGISTERS,
+    // start address
+    .u16RegAdd = 0,
+    // number of elements to read
+    .u16CoilsNo = 1,
+  };
+  
+  modbus_t telegram_umvh = {
+    // function code
+    .u8fct = MB_FC_READ_REGISTERS,
+    // start address
+    .u16RegAdd = 0,
+    // number of elements to read
+    .u16CoilsNo = 9,
+    // pointer to a memory array
+    .u16reg = mb_reg_umvh,
+    // set the Modbus request parameters
+    .u8id = settings.umvh_id,
+  };
+  
+  modbus_t telegram_urm = {
+    // function code 15
+    .u8fct = MB_FC_WRITE_MULTIPLE_COILS,
+    // start address
+    .u16RegAdd = 0,
+    // number of elements to read
+    .u16CoilsNo = 16,
+    // pointer to a memory array
+    .u16reg = &mb_reg_urm,
+    // set the Modbus request parameters
+    .u8id = settings.urm_id,    
+  };
+  
+  uint32_t notification;
+  
+  memset(mb_reg_pressure, 0, sizeof(mb_reg_pressure)/sizeof(mb_reg_pressure[0]));
   
   uint32_t tick = osKernelGetTickCount();
   
@@ -833,9 +876,154 @@ static void main_task_thread(void *argument) {
     zap[0] = HAL_GetTick();
 #endif
     
-    // Modbus логика временно отключена для выполнения UART теста из main loop.
-    osDelayUntil(tick);
-    continue;
+    if (uart_test.running) {
+      osDelayUntil(tick);
+      continue;
+    }
+
+    // read pressure sensor1
+    telegram_sensor_pressure.u8id = settings.sens1_id;
+    telegram_sensor_pressure.u16reg = &mb_reg_pressure[MAINLINE];
+    
+    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
+
+#ifdef DEBUG
+    zap[1] = HAL_GetTick();
+    zap[2] = zap[1] - zap[0];  
+#endif
+    
+    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
+      if (notification != MB_ERR_OK) {
+        oled_msg.pressure_sensor[MAINLINE].state = STATE_OFFLINE;
+      } else {
+        oled_msg.pressure_sensor[MAINLINE].state = STATE_ONLINE;
+        
+        oled_msg.pressure_sensor[MAINLINE].value = mb_reg_pressure[MAINLINE] / 100.0f;
+      }
+      osSemaphoreRelease(msgSemaphore);
+    }
+    
+#ifdef DEBUG
+    zap[3] = HAL_GetTick();
+#endif
+    
+    // read pressure sensor2
+    telegram_sensor_pressure.u8id = settings.sens2_id;
+    telegram_sensor_pressure.u16reg = &mb_reg_pressure[HYDRAULIC];
+    
+    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
+
+#ifdef DEBUG
+    zap[4] = HAL_GetTick();
+    zap[5] = zap[4] - zap[3];
+#endif
+    
+    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
+      if (notification != MB_ERR_OK) {
+        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_OFFLINE;
+      } else {
+        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_NORMAL;
+        
+        oled_msg.pressure_sensor[HYDRAULIC].value = mb_reg_pressure[HYDRAULIC] / 100.0f;
+        
+        // pressure outside the working range?
+        if (mb_reg_pressure[HYDRAULIC] < settings.sens2_min_val) {
+          // error
+          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_BELOW_NORMAL;
+        } else if (mb_reg_pressure[HYDRAULIC] > settings.sens2_max_val) {
+          // error
+          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_ABOVE_NORMAL;
+        }
+      }
+      osSemaphoreRelease(msgSemaphore);
+    }
+
+#ifdef DEBUG
+    zap[6] = HAL_GetTick();
+#endif
+
+/*    
+    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
+      if (msg.state_in) {
+        telegram_urm.u8fct = MB_FC_WRITE_MULTIPLE_COILS;
+        telegram_urm.u16CoilsNo = 16;
+      } else {
+        telegram_urm.u8fct = MB_FC_READ_REGISTERS;
+        telegram_urm.u16CoilsNo = 1;
+      }
+      osSemaphoreRelease(msgSemaphore);
+    }
+*/
+
+    notification = modbus_query(&ModbusRS2, &telegram_urm, 2);
+
+#ifdef DEBUG
+    zap[7] = HAL_GetTick();
+    zap[8] = zap[7] - zap[6];
+#endif
+    
+    if (notification != MB_ERR_OK) {
+      oled_msg.valve.state = STATE_OFFLINE;
+      oled_msg.urm_state = STATE_OFFLINE;
+    } else {
+      oled_msg.valve.state = STATE_ONLINE;
+      oled_msg.urm_state = STATE_ONLINE;
+    }
+    
+    //mb_reg_urm = 0;
+    
+#ifdef DEBUG
+    zap[9] = HAL_GetTick();
+#endif
+
+    // read displacement sensor and start signal
+    notification = modbus_query(&ModbusRS2, &telegram_umvh, 2);
+
+#ifdef DEBUG
+    zap[10] = HAL_GetTick();
+    zap[11] = zap[10] - zap[9];
+#endif
+
+    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
+      // offline
+      if (notification != MB_ERR_OK) {
+        oled_msg.umvh_state = STATE_OFFLINE;
+        oled_msg.position_state = STATE_OFFLINE;
+      } else {
+        oled_msg.umvh_state = STATE_ONLINE;
+        oled_msg.position_state = STATE_ONLINE;
+      }
+      osSemaphoreRelease(msgSemaphore);
+    }
+    
+    if (osSemaphoreAcquire(valve_controlSemaphore, 2) == osOK) {
+      if (local_valve_control.tick < osKernelGetTickCount() || 
+          local_valve_control.state == VALVE_STOP) 
+      {
+        local_valve_control.state = VALVE_STOP;
+        // close valve1 
+        bitClear(mb_reg_urm, settings.valve1_io - 1);
+        // close valve2
+        bitClear(mb_reg_urm, settings.valve2_io - 1);
+      } else {
+        // decrease coordinate
+        if (local_valve_control.state == VALVE_DOWN) {
+          // close valve1 
+          bitClear(mb_reg_urm, settings.valve1_io - 1);
+          // open valve2
+          bitSet(mb_reg_urm, settings.valve2_io - 1);
+        }
+        // increase coordinate
+        if (local_valve_control.state == VALVE_UP) { 
+          // open valve1 
+          bitSet(mb_reg_urm, settings.valve1_io - 1);
+          // close valve2
+          bitClear(mb_reg_urm, settings.valve2_io - 1);
+        }
+      }
+      oled_msg.valve.value_out = mb_reg_urm;
+      osSemaphoreRelease(valve_controlSemaphore);
+    }
     
 /*
     if (((mb_reg_umvh[settings.sens3_io] >> 12) & 0xF) == VOLTAGE_IN && oled_msg.umvh_state == STATE_ONLINE) {
