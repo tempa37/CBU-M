@@ -40,6 +40,7 @@
 
 #include "manage_settings.h"
 #include "ring_line.h"
+#include "usart.h"
 
 /* USER CODE END Includes */
 
@@ -219,6 +220,31 @@ modbusHandler_t ModbusTCPs;
 
 uint16_t ModbusDATA_Slave[64];
 
+typedef enum {
+  UART_TEST_IDLE = 0,
+  UART_TEST_REQUESTED = 1,
+  UART_TEST_RUNNING = 2,
+  UART_TEST_DONE = 3,
+} uart_test_state_t;
+
+typedef enum {
+  UART_TEST_ERR_NONE = 0,
+  UART_TEST_ERR_RS485_OFF = 1,
+  UART_TEST_ERR_TX_FAIL = 2,
+  UART_TEST_ERR_RX_FAIL = 3,
+  UART_TEST_ERR_SIZE_MISMATCH = 4,
+  UART_TEST_ERR_DATA_MISMATCH = 5,
+} uart_test_error_t;
+
+static volatile uart_test_result_t uart_test_result = {
+  .state = UART_TEST_IDLE,
+  .success = 0,
+  .step = 0,
+  .error = UART_TEST_ERR_NONE,
+  .started_tick = 0,
+  .finished_tick = 0,
+};
+
 /* USER CODE END Variables */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -231,6 +257,7 @@ static void main_task_thread(void *argument);
 static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
+static uint8_t run_uart_loopback_test(void);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -659,6 +686,156 @@ uint16_t count_bits_set_parallel(uint64_t x) {
   x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0fUL;
   // returns left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ...
   return (x * 0x0101010101010101UL) >> 56;
+}
+
+void uart_test_request_start(void) {
+  if (uart_test_result.state == UART_TEST_RUNNING || uart_test_result.state == UART_TEST_REQUESTED) {
+    return;
+  }
+
+  uart_test_result.state = UART_TEST_REQUESTED;
+  uart_test_result.success = 0;
+  uart_test_result.step = 0;
+  uart_test_result.error = UART_TEST_ERR_NONE;
+  uart_test_result.started_tick = HAL_GetTick();
+  uart_test_result.finished_tick = 0;
+}
+
+void uart_test_get_result(uart_test_result_t *result) {
+  if (result == NULL) {
+    return;
+  }
+
+  *result = uart_test_result;
+}
+
+static uint8_t run_uart_loopback_test(void) {
+  uint8_t tx_packet[8] = {0xA5, 0x5A, 0x11, 0x22, 0x33, 0x44, 0xC3, 0x3C};
+  uint8_t rx_packet[sizeof(tx_packet)] = {0};
+
+  uart_test_result.state = UART_TEST_RUNNING;
+  uart_test_result.success = 0;
+  uart_test_result.step = 1;
+  uart_test_result.error = UART_TEST_ERR_NONE;
+  uart_test_result.started_tick = HAL_GetTick();
+  uart_test_result.finished_tick = 0;
+
+  if ((HAL_GPIO_ReadPin(RS485_1_ON_Port, RS485_1_ON_Pin) == GPIO_PIN_RESET) ||
+      (HAL_GPIO_ReadPin(RS485_2_ON_Port, RS485_2_ON_Pin) == GPIO_PIN_RESET)) {
+    uart_test_result.error = UART_TEST_ERR_RS485_OFF;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  uart_test_result.step = 2;
+  if (HAL_UART_DeInit(&huart1) != HAL_OK || HAL_UART_DeInit(&huart3) != HAL_OK) {
+    uart_test_result.error = UART_TEST_ERR_TX_FAIL;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  huart1.Init.BaudRate = 115200;
+  huart3.Init.BaudRate = 115200;
+  if (HAL_UART_Init(&huart1) != HAL_OK || HAL_UART_Init(&huart3) != HAL_OK) {
+    uart_test_result.error = UART_TEST_ERR_TX_FAIL;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  memset(rx_packet, 0, sizeof(rx_packet));
+  uart_test_result.step = 3;
+  if (HAL_UART_Receive_IT(&huart3, rx_packet, sizeof(rx_packet)) != HAL_OK) {
+    uart_test_result.error = UART_TEST_ERR_RX_FAIL;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  HAL_Delay(20);
+  if (HAL_UART_Transmit(&huart1, tx_packet, sizeof(tx_packet), 200) != HAL_OK) {
+    uart_test_result.error = UART_TEST_ERR_TX_FAIL;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  HAL_Delay(80);
+
+  if (huart3.RxXferCount != 0) {
+    uart_test_result.error = UART_TEST_ERR_SIZE_MISMATCH;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  if (memcmp(tx_packet, rx_packet, sizeof(tx_packet)) != 0) {
+    uart_test_result.error = UART_TEST_ERR_DATA_MISMATCH;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  uart_test_result.step = 4;
+  if (HAL_UART_DeInit(&huart1) != HAL_OK || HAL_UART_DeInit(&huart3) != HAL_OK) {
+    uart_test_result.error = UART_TEST_ERR_TX_FAIL;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  huart3.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 115200;
+  if (HAL_UART_Init(&huart3) != HAL_OK || HAL_UART_Init(&huart1) != HAL_OK) {
+    uart_test_result.error = UART_TEST_ERR_TX_FAIL;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  memset(rx_packet, 0, sizeof(rx_packet));
+  uart_test_result.step = 5;
+  if (HAL_UART_Receive_IT(&huart1, rx_packet, sizeof(rx_packet)) != HAL_OK) {
+    uart_test_result.error = UART_TEST_ERR_RX_FAIL;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  HAL_Delay(20);
+  if (HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 200) != HAL_OK) {
+    uart_test_result.error = UART_TEST_ERR_TX_FAIL;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  HAL_Delay(80);
+
+  if (huart1.RxXferCount != 0) {
+    uart_test_result.error = UART_TEST_ERR_SIZE_MISMATCH;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  if (memcmp(tx_packet, rx_packet, sizeof(tx_packet)) != 0) {
+    uart_test_result.error = UART_TEST_ERR_DATA_MISMATCH;
+    uart_test_result.state = UART_TEST_DONE;
+    uart_test_result.finished_tick = HAL_GetTick();
+    return 0;
+  }
+
+  MX_USART1_UART_Init();
+  MX_USART3_UART_Init();
+
+  uart_test_result.success = 1;
+  uart_test_result.error = UART_TEST_ERR_NONE;
+  uart_test_result.state = UART_TEST_DONE;
+  uart_test_result.finished_tick = HAL_GetTick();
+  return 1;
 }
 
 /**
@@ -1137,6 +1314,10 @@ static void main_task_thread(void *argument) {
 #if CHECK_LOAD_SYSTEM == 1
     osEventFlagsSet(load_system_flags, MAIN_LOAD_BIT);
 #endif
+
+    if (uart_test_result.state == UART_TEST_REQUESTED) {
+      run_uart_loopback_test();
+    }
 
     osDelayUntil(tick);
   }
