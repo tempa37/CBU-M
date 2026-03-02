@@ -269,3 +269,30 @@ document.getElementById("sens3_io").value = settings_json.sens3_io;
 }
 document.getElementById("state_in_io").value = settings_json.state_in_io;
 }
+
+async function UartTest() {
+let xhr = new XMLHttpRequest();
+return new Promise(function(resolve, reject) {
+xhr.open("GET", "/uart_test.json");
+xhr.responseType = "json";
+xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+xhr.timeout = 5000;
+xhr.onload = function() {
+if (xhr.status != 200) {
+console.log("UART test failed");
+console.log(xhr.status + " : " + xhr.statusText);
+resolve(null);
+} else {
+resolve(xhr.response);
+}
+};
+xhr.onerror = function() {
+reject(new Error("UART test request failed"));
+};
+xhr.ontimeout = function() {
+resolve(null);
+};
+xhr.send();
+});
+}

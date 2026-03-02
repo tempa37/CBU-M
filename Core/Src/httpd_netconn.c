@@ -13,6 +13,7 @@
 #include "tcp.h"
 #include "global_types.h"
 #include "manage_settings.h"
+#include "usart.h"
 
 // modbus master/slave rtu, tcp
 #include "Modbus.h"
@@ -245,6 +246,67 @@ void status_sys(struct netconn *conn) {
    
     send_response(conn);
     
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
+void stage_uart_test(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    uint8_t tx_packet_a[] = {0x55, 0xAA, 0x10, 0x20, 0x30, 0x40};
+    uint8_t tx_packet_b[] = {0x5A, 0xA5, 0x01, 0x02, 0x03, 0x04};
+    uint8_t rx_packet[sizeof(tx_packet_a)] = {0};
+
+    uint8_t test_a_ok = 0;
+    uint8_t test_b_ok = 0;
+    uint8_t tx_status_a = 0;
+    uint8_t rx_status_a = 0;
+    uint8_t tx_status_b = 0;
+    uint8_t rx_status_b = 0;
+
+    memset(html, 0, HTML_LEN);
+    length_html = 0;
+
+    /* Test A: USART1 TX -> USART3 RX */
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
+    osDelay(pdMS_TO_TICKS(20));
+
+    memset(rx_packet, 0, sizeof(rx_packet));
+    tx_status_a = (uint8_t)HAL_UART_Transmit(&huart1, tx_packet_a, sizeof(tx_packet_a), 200);
+    osDelay(pdMS_TO_TICKS(20));
+    rx_status_a = (uint8_t)HAL_UART_Receive(&huart3, rx_packet, sizeof(rx_packet), 200);
+    if ((tx_status_a == HAL_OK) && (rx_status_a == HAL_OK) &&
+      (memcmp(tx_packet_a, rx_packet, sizeof(tx_packet_a)) == 0)) {
+      test_a_ok = 1;
+    }
+
+    /* Test B: swapped order, USART3 TX -> USART1 RX */
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
+    osDelay(pdMS_TO_TICKS(20));
+
+    memset(rx_packet, 0, sizeof(rx_packet));
+    tx_status_b = (uint8_t)HAL_UART_Transmit(&huart3, tx_packet_b, sizeof(tx_packet_b), 200);
+    osDelay(pdMS_TO_TICKS(20));
+    rx_status_b = (uint8_t)HAL_UART_Receive(&huart1, rx_packet, sizeof(rx_packet), 200);
+    if ((tx_status_b == HAL_OK) && (rx_status_b == HAL_OK) &&
+      (memcmp(tx_packet_b, rx_packet, sizeof(tx_packet_b)) == 0)) {
+      test_b_ok = 1;
+    }
+
+    /* Return both ports to RX mode. */
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
+
+    length_html += sprintf((char*)(html + length_html),
+      "{\"ok\":\"%d\",\"test_a\":\"%d\",\"test_b\":\"%d\","
+      "\"tx_status_a\":\"%d\",\"rx_status_a\":\"%d\","
+      "\"tx_status_b\":\"%d\",\"rx_status_b\":\"%d\"}",
+      (test_a_ok && test_b_ok), test_a_ok, test_b_ok,
+      tx_status_a, rx_status_a, tx_status_b, rx_status_b);
+
+    send_response(conn);
+
     osSemaphoreRelease(httpdbufSemaphore);
   }
 }
@@ -764,6 +826,9 @@ static void http_server(struct netconn *conn) {
           }
           else if (strncmp(buf, "GET /info.json", 14) == 0) {
             status_sys(conn);
+          }
+          else if (strncmp(buf, "GET /uart_test.json", 19) == 0) {
+            stage_uart_test(conn);
           }
           else if (strncmp(buf, "GET /info.html", 14) == 0) {
             fs_open(&file, "/info.html");

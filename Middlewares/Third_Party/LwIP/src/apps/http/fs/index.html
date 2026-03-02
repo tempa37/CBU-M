@@ -348,7 +348,7 @@ background-color: #dff2ef;
 
 <div class="elem0">
 <div class="left_col">Тест UART</div>
-<div class="right_col"><button type="button">Запустить</button></div>
+<div class="right_col"><button id="uart-test-button" type="button">Запустить</button></div>
 </div>
 
 <div class="elem0">
@@ -399,6 +399,34 @@ function initPinStateToggle() {
 	}
 }
 
+
+function initUartTestButton() {
+	let uartTestButton = document.getElementById("uart-test-button");
+	if (uartTestButton != null) {
+		uartTestButton.addEventListener("click", async function() {
+			uartTestButton.disabled = true;
+			try {
+				let result = await UartTest();
+				if (result == null) {
+					alert("Тест UART: нет ответа от устройства");
+				} else {
+					let details = `A:${result.test_a} B:${result.test_b} TXA:${result.tx_status_a} RXA:${result.rx_status_a} TXB:${result.tx_status_b} RXB:${result.rx_status_b}`;
+					if (parseInt(result.ok) == 1) {
+						alert("Тест UART: УСПЕШНО\n" + details);
+					} else {
+						alert("Тест UART: ОШИБКА\n" + details);
+					}
+				}
+			} catch (e) {
+				alert("Тест UART: ошибка запроса");
+				console.log(e);
+			} finally {
+				uartTestButton.disabled = false;
+			}
+		});
+	}
+}
+
 async function up() {
 	let count = 4;
 	for (let n = 1; n <= count; n++) {
@@ -417,6 +445,7 @@ async function up() {
 }
 up();
 initPinStateToggle();
+initUartTestButton();
 window.onload = function() {
 	State1();
 }
