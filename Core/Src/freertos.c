@@ -40,6 +40,7 @@
 
 #include "manage_settings.h"
 #include "ring_line.h"
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -219,6 +220,17 @@ modbusHandler_t ModbusTCPs;
 
 uint16_t ModbusDATA_Slave[64];
 
+volatile uint8_t uart_test_request = 0;
+volatile uint8_t uart_test_ready = 0;
+volatile uint8_t uart_test_ok = 0;
+char uart_test_message[96] = "Тест не запускался";
+
+typedef enum {
+  UART_TEST_IDLE = 0,
+  UART_TEST_RUN,
+  UART_TEST_DONE,
+} uart_test_state_t;
+
 /* USER CODE END Variables */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -231,6 +243,8 @@ static void main_task_thread(void *argument);
 static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
+static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3);
+static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -666,6 +680,45 @@ uint16_t count_bits_set_parallel(uint64_t x) {
  * @param argument: Not used
  * @retval None
  */
+
+static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
+  HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_SET);
+
+  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, tx1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, tx3 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
+  uint8_t rx_buf[8] = {0};
+
+  HAL_UART_Abort(rx_uart);
+  HAL_UART_Abort(tx_uart);
+
+  uart_test_set_rs485(tx1, tx1 ? 0 : 1);
+  osDelay(10);
+
+  if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
+    return;
+  }
+
+  osDelay(10);
+
+  if (HAL_UART_Receive(rx_uart, rx_buf, len, 150) != HAL_OK) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
+    return;
+  }
+
+  if (memcmp(rx_buf, packet, len) != 0) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет не совпал", name);
+    return;
+  }
+}
+
 static void main_task_thread(void *argument) {
   (void) argument;
   
@@ -721,6 +774,9 @@ static void main_task_thread(void *argument) {
   switch_state = 0;
   
   osStatus_t status;
+  uart_test_state_t uart_test_state = UART_TEST_IDLE;
+  const uint8_t uart_packet_a[6] = {0xA5, 0x5A, 0x01, 0x02, 0x03, 0x04};
+  const uint8_t uart_packet_b[6] = {0x3C, 0xC3, 0x10, 0x20, 0x30, 0x40};
   
   control_type_t control_id = CTRL_UNDEFINED;
   
@@ -757,6 +813,35 @@ static void main_task_thread(void *argument) {
           break;
         }
       }
+    }
+
+    if (uart_test_request && uart_test_state != UART_TEST_RUN) {
+      uart_test_request = 0;
+      uart_test_ready = 0;
+      uart_test_ok = 1;
+      snprintf(uart_test_message, sizeof(uart_test_message), "Тест выполняется");
+      uart_test_state = UART_TEST_RUN;
+    }
+
+    if (uart_test_state == UART_TEST_RUN) {
+      uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
+      if (uart_test_ok) {
+        osDelay(50);
+        uart_test_run_once(&huart3, &huart1, 0, uart_packet_b, sizeof(uart_packet_b), "UART3->UART1", (uint8_t *)&uart_test_ok);
+      }
+      uart_test_set_rs485(0, 0);
+      HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
+      if (uart_test_ok) {
+        snprintf(uart_test_message, sizeof(uart_test_message), "UART1<->UART3 OK");
+      }
+      uart_test_ready = 1;
+      uart_test_state = UART_TEST_DONE;
+    }
+
+    if (uart_test_state == UART_TEST_RUN) {
+      osDelay(20);
+      continue;
     }
 
 #ifdef DEBUG

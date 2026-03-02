@@ -187,6 +187,10 @@ extern osSemaphoreId_t flash_semaphore;
 //extern modbusHandler_t ModbusTCPm;
 extern modbusHandler_t ModbusRS1;
 extern modbusHandler_t ModbusRS2;
+extern volatile uint8_t uart_test_request;
+extern volatile uint8_t uart_test_ready;
+extern volatile uint8_t uart_test_ok;
+extern char uart_test_message[96];
 
 void send_response(struct netconn *conn) {
   char content_length_header[32] = {0};
@@ -699,6 +703,27 @@ void authorization_process(struct netconn *conn, const char *buf, const char *ur
  * @brief Routing http data
  *
  */
+
+static void uart_test_start(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    uart_test_request = 1;
+    uart_test_ready = 0;
+    memset(html, 0, HTML_LEN);
+    length_html = sprintf((char *)html, "{\"started\":1}");
+    send_response(conn);
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
+static void uart_test_result(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    memset(html, 0, HTML_LEN);
+    length_html = sprintf((char *)html, "{\"ready\":%d,\"ok\":%d,\"message\":\"%s\"}", uart_test_ready, uart_test_ok, uart_test_message);
+    send_response(conn);
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
 static void http_server(struct netconn *conn) {
   struct netbuf *inbuf;
   char* buf;
@@ -764,6 +789,12 @@ static void http_server(struct netconn *conn) {
           }
           else if (strncmp(buf, "GET /info.json", 14) == 0) {
             status_sys(conn);
+          }
+          else if (strncmp(buf, "GET /uart_test_start", 20) == 0) {
+            uart_test_start(conn);
+          }
+          else if (strncmp(buf, "GET /uart_test_result", 21) == 0) {
+            uart_test_result(conn);
           }
           else if (strncmp(buf, "GET /info.html", 14) == 0) {
             fs_open(&file, "/info.html");

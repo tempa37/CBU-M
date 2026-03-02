@@ -348,7 +348,7 @@ background-color: #dff2ef;
 
 <div class="elem0">
 <div class="left_col">Тест UART</div>
-<div class="right_col"><button type="button">Запустить</button></div>
+<div class="right_col"><button id="uart-test-btn" type="button">Запустить</button></div>
 </div>
 
 <div class="elem0">
@@ -419,6 +419,10 @@ up();
 initPinStateToggle();
 window.onload = function() {
 	State1();
+	let uartBtn = document.getElementById("uart-test-btn");
+	if (uartBtn != null) {
+		uartBtn.addEventListener("click", StartUartTest);
+	}
 }
 </script>
 </html>
