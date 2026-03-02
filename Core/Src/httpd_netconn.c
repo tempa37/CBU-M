@@ -249,6 +249,37 @@ void status_sys(struct netconn *conn) {
   }
 }
 
+void uart_test_start(struct netconn *conn) {
+  uart_test_request_start();
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    memset(html, 0, HTML_LEN);
+    length_html = sprintf((char *)html, "{\"ok\":\"1\",\"state\":\"started\"}");
+    send_response(conn);
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
+void uart_test_status(struct netconn *conn) {
+  uint8_t running = 0;
+  uint8_t done = 0;
+  uint8_t success = 0;
+  const char *message = "";
+
+  uart_test_get_status(&running, &done, &success, &message);
+
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    memset(html, 0, HTML_LEN);
+    length_html = sprintf((char *)html,
+                          "{\"running\":\"%u\",\"done\":\"%u\",\"success\":\"%u\",\"message\":\"%s\"}",
+                          running,
+                          done,
+                          success,
+                          message);
+    send_response(conn);
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
 /**
  * @brief initialization
  *
@@ -764,6 +795,12 @@ static void http_server(struct netconn *conn) {
           }
           else if (strncmp(buf, "GET /info.json", 14) == 0) {
             status_sys(conn);
+          }
+          else if (strncmp(buf, "GET /uart_test_start.json", 25) == 0) {
+            uart_test_start(conn);
+          }
+          else if (strncmp(buf, "GET /uart_test_status.json", 26) == 0) {
+            uart_test_status(conn);
           }
           else if (strncmp(buf, "GET /info.html", 14) == 0) {
             fs_open(&file, "/info.html");

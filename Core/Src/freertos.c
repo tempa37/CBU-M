@@ -219,6 +219,36 @@ modbusHandler_t ModbusTCPs;
 
 uint16_t ModbusDATA_Slave[64];
 
+typedef struct {
+  volatile uint8_t request;
+  volatile uint8_t running;
+  volatile uint8_t done;
+  volatile uint8_t success;
+  char message[96];
+} uart_test_state_t;
+
+static uart_test_state_t uart_test = {0};
+
+void uart_test_request_start(void) {
+  uart_test.request = 1;
+}
+
+uint8_t uart_test_get_status(uint8_t *running, uint8_t *done, uint8_t *success, const char **message) {
+  if (running != NULL) {
+    *running = uart_test.running;
+  }
+  if (done != NULL) {
+    *done = uart_test.done;
+  }
+  if (success != NULL) {
+    *success = uart_test.success;
+  }
+  if (message != NULL) {
+    *message = uart_test.message;
+  }
+  return 1;
+}
+
 /* USER CODE END Variables */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -231,6 +261,8 @@ static void main_task_thread(void *argument);
 static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
+static void uart_test_run(void);
+static uint8_t uart_test_transfer(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, GPIO_TypeDef *tx_en_port, uint16_t tx_en_pin, GPIO_TypeDef *rx_en_port, uint16_t rx_en_pin, uint8_t configure_rx_first);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -661,6 +693,78 @@ uint16_t count_bits_set_parallel(uint64_t x) {
   return (x * 0x0101010101010101UL) >> 56;
 }
 
+static uint8_t uart_test_transfer(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, GPIO_TypeDef *tx_en_port, uint16_t tx_en_pin, GPIO_TypeDef *rx_en_port, uint16_t rx_en_pin, uint8_t configure_rx_first) {
+  static const uint8_t tx_packet[] = {0x55, 0xAA, 0x10, 0x20, 0x30, 0x40};
+  uint8_t rx_packet[sizeof(tx_packet)] = {0};
+
+  HAL_UART_Abort(tx_uart);
+  HAL_UART_Abort(rx_uart);
+
+  if (configure_rx_first) {
+    HAL_UART_DeInit(rx_uart);
+    HAL_UART_Init(rx_uart);
+    HAL_Delay(5);
+    HAL_UART_DeInit(tx_uart);
+    HAL_UART_Init(tx_uart);
+  } else {
+    HAL_UART_DeInit(tx_uart);
+    HAL_UART_Init(tx_uart);
+    HAL_Delay(5);
+    HAL_UART_DeInit(rx_uart);
+    HAL_UART_Init(rx_uart);
+  }
+
+  HAL_GPIO_WritePin(tx_en_port, tx_en_pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(rx_en_port, rx_en_pin, GPIO_PIN_RESET);
+  HAL_Delay(2);
+
+  if (HAL_UART_Transmit(tx_uart, (uint8_t *)tx_packet, sizeof(tx_packet), 100) != HAL_OK) {
+    return 0;
+  }
+
+  if (HAL_UART_Receive(rx_uart, rx_packet, sizeof(rx_packet), 100) != HAL_OK) {
+    return 0;
+  }
+
+  HAL_Delay(2);
+  return (memcmp(tx_packet, rx_packet, sizeof(tx_packet)) == 0) ? 1 : 0;
+}
+
+static void uart_test_run(void) {
+  uint8_t test_a;
+  uint8_t test_b;
+
+  uart_test.request = 0;
+  uart_test.running = 1;
+  uart_test.done = 0;
+  uart_test.success = 0;
+  strcpy(uart_test.message, "Тест UART: выполняется");
+
+  test_a = uart_test_transfer(&huart1, &huart3, UART2_RE_DE_Port, UART2_RE_DE_Pin, UART1_RE_DE_Port, UART1_RE_DE_Pin, 1);
+  HAL_Delay(20);
+  test_b = uart_test_transfer(&huart3, &huart1, UART1_RE_DE_Port, UART1_RE_DE_Pin, UART2_RE_DE_Port, UART2_RE_DE_Pin, 0);
+
+  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
+
+  if (test_a && test_b) {
+    uart_test.success = 1;
+    strcpy(uart_test.message, "UART тест ОК: USART1->USART3 и USART3->USART1");
+  } else {
+    uart_test.success = 0;
+    if (test_a == 0 && test_b == 0) {
+      strcpy(uart_test.message, "UART тест FAIL: оба направления");
+    } else if (test_a == 0) {
+      strcpy(uart_test.message, "UART тест FAIL: USART1->USART3");
+    } else {
+      strcpy(uart_test.message, "UART тест FAIL: USART3->USART1");
+    }
+  }
+
+  uart_test.done = 1;
+  uart_test.running = 0;
+}
+
 /**
  * @brief  
  * @param argument: Not used
@@ -674,45 +778,6 @@ static void main_task_thread(void *argument) {
 #endif
   
   Menu_Navigate(&Menu_7);
-  
-  modbus_t telegram_sensor_pressure = {
-    // function code
-    .u8fct = MB_FC_READ_REGISTERS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 1,
-  };
-  
-  modbus_t telegram_umvh = {
-    // function code
-    .u8fct = MB_FC_READ_REGISTERS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 9,
-    // pointer to a memory array
-    .u16reg = mb_reg_umvh,
-    // set the Modbus request parameters
-    .u8id = settings.umvh_id,
-  };
-  
-  modbus_t telegram_urm = {
-    // function code 15
-    .u8fct = MB_FC_WRITE_MULTIPLE_COILS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 16,
-    // pointer to a memory array
-    .u16reg = &mb_reg_urm,
-    // set the Modbus request parameters
-    .u8id = settings.urm_id,    
-  };
-  
-  uint32_t notification;
-  
-  memset(mb_reg_pressure, 0, sizeof(mb_reg_pressure)/sizeof(mb_reg_pressure[0]));
   
   uint32_t tick = osKernelGetTickCount();
   
@@ -740,6 +805,10 @@ static void main_task_thread(void *argument) {
 
     tick += pdMS_TO_TICKS(settings.mb_rate);
 
+    if (uart_test.request && uart_test.running == 0) {
+      uart_test_run();
+    }
+
     status = osMessageQueueGet(control_msg_queue, &control_id, NULL, 2U);
     if (status == osOK) {
       switch (control_id) {
@@ -764,149 +833,9 @@ static void main_task_thread(void *argument) {
     zap[0] = HAL_GetTick();
 #endif
     
-    // read pressure sensor1
-    telegram_sensor_pressure.u8id = settings.sens1_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[MAINLINE];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[1] = HAL_GetTick();
-    zap[2] = zap[1] - zap[0];  
-#endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_ONLINE;
-        
-        oled_msg.pressure_sensor[MAINLINE].value = mb_reg_pressure[MAINLINE] / 100.0f;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-    
-#ifdef DEBUG
-    zap[3] = HAL_GetTick();
-#endif
-    
-    // read pressure sensor2
-    telegram_sensor_pressure.u8id = settings.sens2_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[HYDRAULIC];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[4] = HAL_GetTick();
-    zap[5] = zap[4] - zap[3];
-#endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_NORMAL;
-        
-        oled_msg.pressure_sensor[HYDRAULIC].value = mb_reg_pressure[HYDRAULIC] / 100.0f;
-        
-        // pressure outside the working range?
-        if (mb_reg_pressure[HYDRAULIC] < settings.sens2_min_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_BELOW_NORMAL;
-        } else if (mb_reg_pressure[HYDRAULIC] > settings.sens2_max_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_ABOVE_NORMAL;
-        }
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-
-#ifdef DEBUG
-    zap[6] = HAL_GetTick();
-#endif
-
-/*    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (msg.state_in) {
-        telegram_urm.u8fct = MB_FC_WRITE_MULTIPLE_COILS;
-        telegram_urm.u16CoilsNo = 16;
-      } else {
-        telegram_urm.u8fct = MB_FC_READ_REGISTERS;
-        telegram_urm.u16CoilsNo = 1;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-*/
-
-    notification = modbus_query(&ModbusRS2, &telegram_urm, 2);
-
-#ifdef DEBUG
-    zap[7] = HAL_GetTick();
-    zap[8] = zap[7] - zap[6];
-#endif
-    
-    if (notification != MB_ERR_OK) {
-      oled_msg.valve.state = STATE_OFFLINE;
-      oled_msg.urm_state = STATE_OFFLINE;
-    } else {
-      oled_msg.valve.state = STATE_ONLINE;
-      oled_msg.urm_state = STATE_ONLINE;
-    }
-    
-    //mb_reg_urm = 0;
-    
-#ifdef DEBUG
-    zap[9] = HAL_GetTick();
-#endif
-
-    // read displacement sensor and start signal
-    notification = modbus_query(&ModbusRS2, &telegram_umvh, 2);
-
-#ifdef DEBUG
-    zap[10] = HAL_GetTick();
-    zap[11] = zap[10] - zap[9];
-#endif
-
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      // offline
-      if (notification != MB_ERR_OK) {
-        oled_msg.umvh_state = STATE_OFFLINE;
-        oled_msg.position_state = STATE_OFFLINE;
-      } else {
-        oled_msg.umvh_state = STATE_ONLINE;
-        oled_msg.position_state = STATE_ONLINE;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-    
-    if (osSemaphoreAcquire(valve_controlSemaphore, 2) == osOK) {
-      if (local_valve_control.tick < osKernelGetTickCount() || 
-          local_valve_control.state == VALVE_STOP) 
-      {
-        local_valve_control.state = VALVE_STOP;
-        // close valve1 
-        bitClear(mb_reg_urm, settings.valve1_io - 1);
-        // close valve2
-        bitClear(mb_reg_urm, settings.valve2_io - 1);
-      } else {
-        // decrease coordinate
-        if (local_valve_control.state == VALVE_DOWN) {
-          // close valve1 
-          bitClear(mb_reg_urm, settings.valve1_io - 1);
-          // open valve2
-          bitSet(mb_reg_urm, settings.valve2_io - 1);
-        }
-        // increase coordinate
-        if (local_valve_control.state == VALVE_UP) { 
-          // open valve1 
-          bitSet(mb_reg_urm, settings.valve1_io - 1);
-          // close valve2
-          bitClear(mb_reg_urm, settings.valve2_io - 1);
-        }
-      }
-      oled_msg.valve.value_out = mb_reg_urm;
-      osSemaphoreRelease(valve_controlSemaphore);
-    }
+    // Modbus логика временно отключена для выполнения UART теста из main loop.
+    osDelayUntil(tick);
+    continue;
     
 /*
     if (((mb_reg_umvh[settings.sens3_io] >> 12) & 0xF) == VOLTAGE_IN && oled_msg.umvh_state == STATE_ONLINE) {
