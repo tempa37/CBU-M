@@ -708,15 +708,15 @@
                 <option>
                     <name>OOCOutputFormat</name>
                     <version>3</version>
-                    <state>3</state>
+                    <state>1</state>
                 </option>
                 <option>
                     <name>OCOutputOverride</name>
-                    <state>0</state>
+                    <state>1</state>
                 </option>
                 <option>
                     <name>OOCOutputFile</name>
-                    <state>project.bin</state>
+                    <state>project.hex</state>
                 </option>
                 <option>
                     <name>OOCCommandLineProducer</name>
@@ -724,7 +724,7 @@
                 </option>
                 <option>
                     <name>OOCObjCopyEnable</name>
-                    <state>0</state>
+                    <state>1</state>
                 </option>
             </data>
         </settings>
@@ -1147,25 +1147,7 @@
         <settings>
             <name>BUILDACTION</name>
             <archiveVersion>2</archiveVersion>
-            <data>
-                <buildActions>
-                    <buildAction>
-                        <cmdline>update_version.py version.h</cmdline>
-                        <workingDirectory>$PROJ_DIR$</workingDirectory>
-                        <buildSequence>preCompile</buildSequence>
-                    </buildAction>
-                    <buildAction>
-                        <cmdline>ielftool.exe $TARGET_PATH$ $TARGET_DIR$\$PROJ_FNAME$_$DATE$.bin --bin</cmdline>
-                        <workingDirectory>$PROJ_DIR$</workingDirectory>
-                        <buildSequence>postLink</buildSequence>
-                    </buildAction>
-                    <buildAction>
-                        <cmdline>ielftool.exe $TARGET_PATH$ $TARGET_DIR$\$PROJ_FNAME$_$DATE$.hex --ihex</cmdline>
-                        <workingDirectory>$PROJ_DIR$</workingDirectory>
-                        <buildSequence>postLink</buildSequence>
-                    </buildAction>
-                </buildActions>
-            </data>
+            <data />
         </settings>
         <settings>
             <name>Coder</name>
@@ -1213,13 +1195,13 @@
                     <name>$PROJ_DIR$\..\Core\Src\main.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\Core\Src\ring_line.c</name>
-                </file>
-                <file>
                     <name>$PROJ_DIR$\..\Core\Src\manage_settings.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\menu.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Src\ring_line.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\spi.c</name>
