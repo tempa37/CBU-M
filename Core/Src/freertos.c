@@ -40,6 +40,7 @@
 
 #include "manage_settings.h"
 #include "ring_line.h"
+#include "usart.h"
 
 /* USER CODE END Includes */
 
@@ -218,6 +219,133 @@ modbusHandler_t ModbusRS1;
 modbusHandler_t ModbusTCPs;
 
 uint16_t ModbusDATA_Slave[64];
+
+typedef enum {
+  UART_TEST_IDLE = 0,
+  UART_TEST_RUNNING = 1,
+  UART_TEST_DONE = 2,
+} uart_test_state_t;
+
+static volatile uint8_t uart_test_requested = 0;
+static volatile uint8_t uart_test_state = UART_TEST_IDLE;
+static volatile uint8_t uart_test_pass_forward = 0;
+static volatile uint8_t uart_test_pass_reverse = 0;
+static volatile uint32_t uart_test_duration_ms = 0;
+static char uart_test_message[96] = "Тест не запускался";
+
+uint8_t uart_test_request_start(void) {
+  if (uart_test_state == UART_TEST_RUNNING) {
+    return 0;
+  }
+
+  uart_test_requested = 1;
+  uart_test_state = UART_TEST_RUNNING;
+  uart_test_pass_forward = 0;
+  uart_test_pass_reverse = 0;
+  uart_test_duration_ms = 0;
+  strncpy(uart_test_message, "Тест UART выполняется", sizeof(uart_test_message) - 1);
+  uart_test_message[sizeof(uart_test_message) - 1] = '\0';
+  return 1;
+}
+
+uint8_t uart_test_get_state(void) {
+  return uart_test_state;
+}
+
+uint8_t uart_test_get_pass_forward(void) {
+  return uart_test_pass_forward;
+}
+
+uint8_t uart_test_get_pass_reverse(void) {
+  return uart_test_pass_reverse;
+}
+
+uint32_t uart_test_get_duration_ms(void) {
+  return uart_test_duration_ms;
+}
+
+const char *uart_test_get_message(void) {
+  return uart_test_message;
+}
+
+static uint8_t uart_pair_check(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t *tx, uint8_t *rx, uint16_t len) {
+  memset(rx, 0, len);
+
+  HAL_UART_Abort(tx_uart);
+  HAL_UART_Abort(rx_uart);
+
+  if (HAL_UART_Receive_DMA(rx_uart, rx, len) != HAL_OK) {
+    HAL_UART_Abort(rx_uart);
+    return 0;
+  }
+
+  osDelay(20);
+  if (HAL_UART_Transmit(tx_uart, tx, len, 300) != HAL_OK) {
+    HAL_UART_Abort(rx_uart);
+    return 0;
+  }
+
+  uint32_t stop = HAL_GetTick() + 500;
+  while ((HAL_GetTick() < stop) && (HAL_UART_GetState(rx_uart) != HAL_UART_STATE_READY)) {
+    osDelay(5);
+  }
+
+  HAL_UART_Abort(rx_uart);
+
+  if (HAL_UART_GetState(rx_uart) != HAL_UART_STATE_READY) {
+    return 0;
+  }
+
+  return (memcmp(tx, rx, len) == 0);
+}
+
+static void run_uart_test_cycle(void) {
+  const uint8_t packet_len = 8;
+  uint8_t tx_packet[8] = {0x55, 0xAA, 0x10, 0x2F, 0x7C, 0x33, 0x99, 0x5A};
+  uint8_t rx_packet[8] = {0};
+  uint32_t start_tick = HAL_GetTick();
+
+  uart_test_pass_forward = 0;
+  uart_test_pass_reverse = 0;
+
+  if (ModbusRS2.myTaskModbusAHandle != NULL) {
+    osThreadSuspend(ModbusRS2.myTaskModbusAHandle);
+  }
+  if (ModbusRS1.myTaskModbusAHandle != NULL) {
+    osThreadSuspend(ModbusRS1.myTaskModbusAHandle);
+  }
+
+  osDelay(30);
+
+  uart_test_pass_forward = uart_pair_check(&huart1, &huart3, tx_packet, rx_packet, packet_len);
+  osDelay(100);
+
+  tx_packet[2] ^= 0x0F;
+  tx_packet[5] ^= 0x3C;
+  uart_test_pass_reverse = uart_pair_check(&huart3, &huart1, tx_packet, rx_packet, packet_len);
+
+  if (ModbusRS2.myTaskModbusAHandle != NULL) {
+    osThreadResume(ModbusRS2.myTaskModbusAHandle);
+  }
+  if (ModbusRS1.myTaskModbusAHandle != NULL) {
+    osThreadResume(ModbusRS1.myTaskModbusAHandle);
+  }
+
+  uart_test_duration_ms = HAL_GetTick() - start_tick;
+  if (uart_test_pass_forward && uart_test_pass_reverse) {
+    strncpy(uart_test_message, "UART тест пройден", sizeof(uart_test_message) - 1);
+  } else if (!uart_test_pass_forward && !uart_test_pass_reverse) {
+    strncpy(uart_test_message, "Ошибка: нет данных в обоих направлениях", sizeof(uart_test_message) - 1);
+  } else if (!uart_test_pass_forward) {
+    strncpy(uart_test_message, "Ошибка: USART1->USART3 пакет не совпал", sizeof(uart_test_message) - 1);
+  } else {
+    strncpy(uart_test_message, "Ошибка: USART3->USART1 пакет не совпал", sizeof(uart_test_message) - 1);
+  }
+  uart_test_message[sizeof(uart_test_message) - 1] = '\0';
+
+  uart_test_state = UART_TEST_DONE;
+  uart_test_requested = 0;
+}
 
 /* USER CODE END Variables */
 
@@ -472,6 +600,11 @@ static void startDefaultTask(void *argument) {
 #ifdef DEBUG
     WM_LWIP = uxTaskGetStackHighWaterMark(NULL);
 #endif
+
+    if (uart_test_requested && uart_test_state == UART_TEST_RUNNING) {
+      run_uart_test_cycle();
+    }
+
     status = osMessageQueueGet(keyboard_msg_queue, &button, NULL, 2U);    
     if (status == osOK) {
       click_tick = HAL_GetTick() + 5000;

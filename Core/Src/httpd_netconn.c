@@ -188,6 +188,48 @@ extern osSemaphoreId_t flash_semaphore;
 extern modbusHandler_t ModbusRS1;
 extern modbusHandler_t ModbusRS2;
 
+uint8_t uart_test_request_start(void);
+uint8_t uart_test_get_state(void);
+uint8_t uart_test_get_pass_forward(void);
+uint8_t uart_test_get_pass_reverse(void);
+uint32_t uart_test_get_duration_ms(void);
+const char *uart_test_get_message(void);
+
+static const char UART_TEST_SCRIPT[] =
+"\n(function(){\n"
+"  function bindUartTest(){\n"
+"    var rows=document.querySelectorAll('#frame5 .elem0');\n"
+"    var btn=null;\n"
+"    for(var i=0;i<rows.length;i++){\n"
+"      var left=rows[i].querySelector('.left_col');\n"
+"      var rightBtn=rows[i].querySelector('button');\n"
+"      if(left && rightBtn && left.textContent && left.textContent.indexOf('Тест UART')!==-1){btn=rightBtn;break;}\n"
+"    }\n"
+"    if(!btn){return;}\n"
+"    btn.addEventListener('click', async function(){\n"
+"      btn.disabled=true;\n"
+"      try{\n"
+"        await fetch('/uart_test/start', {method:'GET', cache:'no-store'});\n"
+"      }catch(e){alert('Не удалось запустить тест UART');btn.disabled=false;return;}\n"
+"      var tries=0;\n"
+"      var timer=setInterval(async function(){\n"
+"        tries++;\n"
+"        try{\n"
+"          var r=await fetch('/uart_test/result', {cache:'no-store'});\n"
+"          var d=await r.json();\n"
+"          if(d.state==='done'){\n"
+"            clearInterval(timer);\n"
+"            btn.disabled=false;\n"
+"            alert((d.pass=='1'?'✅ ' :'❌ ' ) + d.message + '\\nВремя: ' + d.duration_ms + ' мс\\nUSART1→USART3: ' + (d.forward=='1'?'OK':'FAIL') + '\\nUSART3→USART1: ' + (d.reverse=='1'?'OK':'FAIL'));\n"
+"          }\n"
+"          if(tries>30){clearInterval(timer);btn.disabled=false;alert('Тест UART: превышено время ожидания');}\n"
+"        }catch(e){clearInterval(timer);btn.disabled=false;alert('Ошибка запроса результата теста UART');}\n"
+"      },1000);\n"
+"    });\n"
+"  }\n"
+"  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',bindUartTest);}else{bindUartTest();}\n"
+"})();\n";
+
 void send_response(struct netconn *conn) {
   char content_length_header[32] = {0};
   char response_headers[128] = {0};
@@ -245,6 +287,46 @@ void status_sys(struct netconn *conn) {
    
     send_response(conn);
     
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
+
+void uart_test_start(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    memset(html, 0, HTML_LEN);
+    length_html = 0;
+
+    uint8_t accepted = uart_test_request_start();
+    length_html += sprintf((char*)(html + length_html), "{\"accepted\":\"%d\"}", accepted);
+
+    send_response(conn);
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
+void uart_test_result(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    const char *state = "idle";
+    uint8_t st = uart_test_get_state();
+    if (st == 1) {
+      state = "running";
+    } else if (st == 2) {
+      state = "done";
+    }
+
+    memset(html, 0, HTML_LEN);
+    length_html = 0;
+    length_html += sprintf((char*)(html + length_html),
+      "{\"state\":\"%s\",\"pass\":\"%d\",\"forward\":\"%d\",\"reverse\":\"%d\",\"duration_ms\":\"%lu\",\"message\":\"%s\"}",
+      state,
+      (uart_test_get_pass_forward() && uart_test_get_pass_reverse()) ? 1 : 0,
+      uart_test_get_pass_forward(),
+      uart_test_get_pass_reverse(),
+      uart_test_get_duration_ms(),
+      uart_test_get_message());
+
+    send_response(conn);
     osSemaphoreRelease(httpdbufSemaphore);
   }
 }
@@ -739,8 +821,9 @@ static void http_server(struct netconn *conn) {
           }
           else if((strncmp(buf, "GET /index.js", 13) == 0)) {
             fs_open(&file, "/index.js");
-            netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_NOCOPY);
+            netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_NOCOPY | NETCONN_MORE);
             fs_close(&file);
+            netconn_write(conn, (const unsigned char*)UART_TEST_SCRIPT, strlen(UART_TEST_SCRIPT), NETCONN_NOCOPY);
           }
           else if (strncmp(buf, "GET /tuning.html", 16) == 0) {
             authorization_process(conn, buf, "/tuning.html");
@@ -764,6 +847,12 @@ static void http_server(struct netconn *conn) {
           }
           else if (strncmp(buf, "GET /info.json", 14) == 0) {
             status_sys(conn);
+          }
+          else if (strncmp(buf, "GET /uart_test/start", 20) == 0) {
+            uart_test_start(conn);
+          }
+          else if (strncmp(buf, "GET /uart_test/result", 21) == 0) {
+            uart_test_result(conn);
           }
           else if (strncmp(buf, "GET /info.html", 14) == 0) {
             fs_open(&file, "/info.html");
