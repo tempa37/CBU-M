@@ -259,6 +259,7 @@ static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
 static uint8_t run_uart_loopback_test(void);
 static uint8_t wait_uart_rx_done(UART_HandleTypeDef *huart, uint32_t timeout_ms);
+static void uart_test_set_rs485_mode(modbusHandler_t *modH, GPIO_PinState en_state, uint8_t tx_mode);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -725,8 +726,8 @@ static uint8_t run_uart_loopback_test(void) {
   osThreadSuspend(ModbusRS2.myTaskModbusAHandle);
   osThreadSuspend(ModbusRS1.myTaskModbusAHandle);
 
-  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
+  uart_test_set_rs485_mode(&ModbusRS1, GPIO_PIN_RESET, 0);
+  uart_test_set_rs485_mode(&ModbusRS2, GPIO_PIN_RESET, 0);
 
   uart_test_result.step = 2;
   if (HAL_UART_DeInit(&huart1) != HAL_OK || HAL_UART_DeInit(&huart3) != HAL_OK) {
@@ -749,13 +750,13 @@ static uint8_t run_uart_loopback_test(void) {
   }
 
   osDelay(10);
-  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_SET);
+  uart_test_set_rs485_mode(&ModbusRS2, GPIO_PIN_SET, 1);
   if (HAL_UART_Transmit(&huart1, tx_packet, sizeof(tx_packet), 200) != HAL_OK) {
-    HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
+    uart_test_set_rs485_mode(&ModbusRS2, GPIO_PIN_RESET, 0);
     uart_test_result.error = UART_TEST_ERR_TX_FAIL;
     goto uart_test_finish;
   }
-  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
+  uart_test_set_rs485_mode(&ModbusRS2, GPIO_PIN_RESET, 0);
 
   if (!wait_uart_rx_done(&huart3, 250)) {
     uart_test_result.error = UART_TEST_ERR_TIMEOUT;
@@ -793,13 +794,13 @@ static uint8_t run_uart_loopback_test(void) {
   }
 
   osDelay(10);
-  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_SET);
+  uart_test_set_rs485_mode(&ModbusRS1, GPIO_PIN_SET, 1);
   if (HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 200) != HAL_OK) {
-    HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
+    uart_test_set_rs485_mode(&ModbusRS1, GPIO_PIN_RESET, 0);
     uart_test_result.error = UART_TEST_ERR_TX_FAIL;
     goto uart_test_finish;
   }
-  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
+  uart_test_set_rs485_mode(&ModbusRS1, GPIO_PIN_RESET, 0);
 
   if (!wait_uart_rx_done(&huart1, 250)) {
     uart_test_result.error = UART_TEST_ERR_TIMEOUT;
@@ -822,8 +823,8 @@ uart_test_finish:
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
 
-  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
+  uart_test_set_rs485_mode(&ModbusRS1, GPIO_PIN_RESET, 0);
+  uart_test_set_rs485_mode(&ModbusRS2, GPIO_PIN_RESET, 0);
 
   osThreadResume(ModbusRS1.myTaskModbusAHandle);
   osThreadResume(ModbusRS2.myTaskModbusAHandle);
@@ -851,6 +852,22 @@ static uint8_t wait_uart_rx_done(UART_HandleTypeDef *huart, uint32_t timeout_ms)
   }
 
   return 0;
+}
+
+static void uart_test_set_rs485_mode(modbusHandler_t *modH, GPIO_PinState en_state, uint8_t tx_mode) {
+  if (modH == NULL || modH->port == NULL) {
+    return;
+  }
+
+  if (tx_mode) {
+    HAL_HalfDuplex_EnableTransmitter(modH->port);
+  } else {
+    HAL_HalfDuplex_EnableReceiver(modH->port);
+  }
+
+  if (modH->EN_Port != NULL) {
+    HAL_GPIO_WritePin(modH->EN_Port, modH->EN_Pin, en_state);
+  }
 }
 
 /**
@@ -949,6 +966,14 @@ static void main_task_thread(void *argument) {
           break;
         }
       }
+    }
+
+    if (uart_test_result.state == UART_TEST_REQUESTED || uart_test_result.state == UART_TEST_RUNNING) {
+      if (uart_test_result.state == UART_TEST_REQUESTED) {
+        run_uart_loopback_test();
+      }
+      osDelayUntil(tick);
+      continue;
     }
 
 #ifdef DEBUG
@@ -1329,10 +1354,6 @@ static void main_task_thread(void *argument) {
 #if CHECK_LOAD_SYSTEM == 1
     osEventFlagsSet(load_system_flags, MAIN_LOAD_BIT);
 #endif
-
-    if (uart_test_result.state == UART_TEST_REQUESTED) {
-      run_uart_loopback_test();
-    }
 
     osDelayUntil(tick);
   }
