@@ -697,21 +697,13 @@ static uint8_t uart_test_transfer(UART_HandleTypeDef *tx_uart, UART_HandleTypeDe
   static const uint8_t tx_packet[] = {0x55, 0xAA, 0x10, 0x20, 0x30, 0x40};
   uint8_t rx_packet[sizeof(tx_packet)] = {0};
 
-  HAL_UART_Abort(tx_uart);
-  HAL_UART_Abort(rx_uart);
+  HAL_UART_AbortReceive(tx_uart);
+  HAL_UART_AbortReceive(rx_uart);
 
   if (configure_rx_first) {
-    HAL_UART_DeInit(rx_uart);
-    HAL_UART_Init(rx_uart);
     HAL_Delay(5);
-    HAL_UART_DeInit(tx_uart);
-    HAL_UART_Init(tx_uart);
   } else {
-    HAL_UART_DeInit(tx_uart);
-    HAL_UART_Init(tx_uart);
     HAL_Delay(5);
-    HAL_UART_DeInit(rx_uart);
-    HAL_UART_Init(rx_uart);
   }
 
   HAL_GPIO_WritePin(tx_en_port, tx_en_pin, GPIO_PIN_SET);
@@ -740,6 +732,13 @@ static void uart_test_run(void) {
   uart_test.success = 0;
   strcpy(uart_test.message, "Тест UART: выполняется");
 
+  if (ModbusRS2.myTaskModbusAHandle != NULL) {
+    vTaskSuspend(ModbusRS2.myTaskModbusAHandle);
+  }
+  if (ModbusRS1.myTaskModbusAHandle != NULL) {
+    vTaskSuspend(ModbusRS1.myTaskModbusAHandle);
+  }
+
   test_a = uart_test_transfer(&huart1, &huart3, UART2_RE_DE_Port, UART2_RE_DE_Pin, UART1_RE_DE_Port, UART1_RE_DE_Pin, 1);
   HAL_Delay(20);
   test_b = uart_test_transfer(&huart3, &huart1, UART1_RE_DE_Port, UART1_RE_DE_Pin, UART2_RE_DE_Port, UART2_RE_DE_Pin, 0);
@@ -767,6 +766,13 @@ static void uart_test_run(void) {
   // Восстановить штатный прием Modbus после теста.
   ModbusStart(&ModbusRS2);
   ModbusStart(&ModbusRS1);
+
+  if (ModbusRS2.myTaskModbusAHandle != NULL) {
+    vTaskResume(ModbusRS2.myTaskModbusAHandle);
+  }
+  if (ModbusRS1.myTaskModbusAHandle != NULL) {
+    vTaskResume(ModbusRS1.myTaskModbusAHandle);
+  }
 }
 
 /**
