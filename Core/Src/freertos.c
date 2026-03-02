@@ -229,7 +229,7 @@ typedef enum {
 
 typedef enum {
   UART_TEST_ERR_NONE = 0,
-  UART_TEST_ERR_RS485_OFF = 1,
+  UART_TEST_ERR_TIMEOUT = 1,
   UART_TEST_ERR_TX_FAIL = 2,
   UART_TEST_ERR_RX_FAIL = 3,
   UART_TEST_ERR_SIZE_MISMATCH = 4,
@@ -258,6 +258,7 @@ static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
 static uint8_t run_uart_loopback_test(void);
+static uint8_t wait_uart_rx_done(UART_HandleTypeDef *huart, uint32_t timeout_ms);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -712,6 +713,7 @@ void uart_test_get_result(uart_test_result_t *result) {
 static uint8_t run_uart_loopback_test(void) {
   uint8_t tx_packet[8] = {0xA5, 0x5A, 0x11, 0x22, 0x33, 0x44, 0xC3, 0x3C};
   uint8_t rx_packet[sizeof(tx_packet)] = {0};
+  uint8_t result = 0;
 
   uart_test_result.state = UART_TEST_RUNNING;
   uart_test_result.success = 0;
@@ -720,122 +722,135 @@ static uint8_t run_uart_loopback_test(void) {
   uart_test_result.started_tick = HAL_GetTick();
   uart_test_result.finished_tick = 0;
 
-  if ((HAL_GPIO_ReadPin(RS485_1_ON_Port, RS485_1_ON_Pin) == GPIO_PIN_RESET) ||
-      (HAL_GPIO_ReadPin(RS485_2_ON_Port, RS485_2_ON_Pin) == GPIO_PIN_RESET)) {
-    uart_test_result.error = UART_TEST_ERR_RS485_OFF;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
-  }
+  osThreadSuspend(ModbusRS2.myTaskModbusAHandle);
+  osThreadSuspend(ModbusRS1.myTaskModbusAHandle);
+
+  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
 
   uart_test_result.step = 2;
   if (HAL_UART_DeInit(&huart1) != HAL_OK || HAL_UART_DeInit(&huart3) != HAL_OK) {
     uart_test_result.error = UART_TEST_ERR_TX_FAIL;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
   huart1.Init.BaudRate = 115200;
   huart3.Init.BaudRate = 115200;
   if (HAL_UART_Init(&huart1) != HAL_OK || HAL_UART_Init(&huart3) != HAL_OK) {
     uart_test_result.error = UART_TEST_ERR_TX_FAIL;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
   memset(rx_packet, 0, sizeof(rx_packet));
   uart_test_result.step = 3;
   if (HAL_UART_Receive_IT(&huart3, rx_packet, sizeof(rx_packet)) != HAL_OK) {
     uart_test_result.error = UART_TEST_ERR_RX_FAIL;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
-  HAL_Delay(20);
+  osDelay(10);
+  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_SET);
   if (HAL_UART_Transmit(&huart1, tx_packet, sizeof(tx_packet), 200) != HAL_OK) {
+    HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
     uart_test_result.error = UART_TEST_ERR_TX_FAIL;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
+  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
 
-  HAL_Delay(80);
+  if (!wait_uart_rx_done(&huart3, 250)) {
+    uart_test_result.error = UART_TEST_ERR_TIMEOUT;
+    goto uart_test_finish;
+  }
 
   if (huart3.RxXferCount != 0) {
     uart_test_result.error = UART_TEST_ERR_SIZE_MISMATCH;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
   if (memcmp(tx_packet, rx_packet, sizeof(tx_packet)) != 0) {
     uart_test_result.error = UART_TEST_ERR_DATA_MISMATCH;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
   uart_test_result.step = 4;
   if (HAL_UART_DeInit(&huart1) != HAL_OK || HAL_UART_DeInit(&huart3) != HAL_OK) {
     uart_test_result.error = UART_TEST_ERR_TX_FAIL;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
   huart3.Init.BaudRate = 115200;
   huart1.Init.BaudRate = 115200;
   if (HAL_UART_Init(&huart3) != HAL_OK || HAL_UART_Init(&huart1) != HAL_OK) {
     uart_test_result.error = UART_TEST_ERR_TX_FAIL;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
   memset(rx_packet, 0, sizeof(rx_packet));
   uart_test_result.step = 5;
   if (HAL_UART_Receive_IT(&huart1, rx_packet, sizeof(rx_packet)) != HAL_OK) {
     uart_test_result.error = UART_TEST_ERR_RX_FAIL;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
-  HAL_Delay(20);
+  osDelay(10);
+  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_SET);
   if (HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 200) != HAL_OK) {
+    HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
     uart_test_result.error = UART_TEST_ERR_TX_FAIL;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
+  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
 
-  HAL_Delay(80);
+  if (!wait_uart_rx_done(&huart1, 250)) {
+    uart_test_result.error = UART_TEST_ERR_TIMEOUT;
+    goto uart_test_finish;
+  }
 
   if (huart1.RxXferCount != 0) {
     uart_test_result.error = UART_TEST_ERR_SIZE_MISMATCH;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
   if (memcmp(tx_packet, rx_packet, sizeof(tx_packet)) != 0) {
     uart_test_result.error = UART_TEST_ERR_DATA_MISMATCH;
-    uart_test_result.state = UART_TEST_DONE;
-    uart_test_result.finished_tick = HAL_GetTick();
-    return 0;
+    goto uart_test_finish;
   }
 
+  result = 1;
+
+uart_test_finish:
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
 
-  uart_test_result.success = 1;
-  uart_test_result.error = UART_TEST_ERR_NONE;
+  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
+
+  osThreadResume(ModbusRS1.myTaskModbusAHandle);
+  osThreadResume(ModbusRS2.myTaskModbusAHandle);
+
+  uart_test_result.success = result;
+  if (result) {
+    uart_test_result.error = UART_TEST_ERR_NONE;
+  }
   uart_test_result.state = UART_TEST_DONE;
   uart_test_result.finished_tick = HAL_GetTick();
-  return 1;
+  return result;
+}
+
+static uint8_t wait_uart_rx_done(UART_HandleTypeDef *huart, uint32_t timeout_ms) {
+  uint32_t start_tick = HAL_GetTick();
+
+  while ((HAL_GetTick() - start_tick) < timeout_ms) {
+    if (huart->RxXferCount == 0) {
+      return 1;
+    }
+    if (huart->ErrorCode != HAL_UART_ERROR_NONE) {
+      return 0;
+    }
+    osDelay(1);
+  }
+
+  return 0;
 }
 
 /**
