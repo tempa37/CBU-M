@@ -219,6 +219,73 @@ modbusHandler_t ModbusTCPs;
 
 uint16_t ModbusDATA_Slave[64];
 
+#ifndef UART_TEST_API_DEFINED
+#define UART_TEST_API_DEFINED
+
+typedef struct {
+  volatile uint8_t request;
+  volatile uint8_t running;
+  volatile uint8_t done;
+  volatile uint8_t success;
+  char message[96];
+} uart_test_state_t;
+
+static uart_test_state_t uart_test = {0};
+
+void uart_test_request_start(void) {
+  uart_test.request = 1;
+}
+
+uint8_t uart_test_get_status(uint8_t *running, uint8_t *done, uint8_t *success, const char **message) {
+  if (running != NULL) {
+    *running = uart_test.running;
+  }
+  if (done != NULL) {
+    *done = uart_test.done;
+  }
+  if (success != NULL) {
+    *success = uart_test.success;
+  }
+  if (message != NULL) {
+    *message = uart_test.message;
+  }
+  return 1;
+}
+
+#endif
+
+static void uart_test_run(void);
+static uint8_t uart_test_transfer(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, GPIO_TypeDef *tx_en_port, uint16_t tx_en_pin, GPIO_TypeDef *rx_en_port, uint16_t rx_en_pin, uint8_t configure_rx_first);
+typedef struct {
+  volatile uint8_t request;
+  volatile uint8_t running;
+  volatile uint8_t done;
+  volatile uint8_t success;
+  char message[96];
+} uart_test_state_t;
+
+static uart_test_state_t uart_test = {0};
+
+void uart_test_request_start(void) {
+  uart_test.request = 1;
+}
+
+uint8_t uart_test_get_status(uint8_t *running, uint8_t *done, uint8_t *success, const char **message) {
+  if (running != NULL) {
+    *running = uart_test.running;
+  }
+  if (done != NULL) {
+    *done = uart_test.done;
+  }
+  if (success != NULL) {
+    *success = uart_test.success;
+  }
+  if (message != NULL) {
+    *message = uart_test.message;
+  }
+  return 1;
+}
+
 /* USER CODE END Variables */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -231,6 +298,8 @@ static void main_task_thread(void *argument);
 static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
+static void uart_test_run(void);
+static uint8_t uart_test_transfer(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, GPIO_TypeDef *tx_en_port, uint16_t tx_en_pin, GPIO_TypeDef *rx_en_port, uint16_t rx_en_pin, uint8_t configure_rx_first);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -257,9 +326,9 @@ void MX_FREERTOS_Init(void) {
   }  
 
   // button "to the right" and button "to the left"
-  if ((HAL_GPIO_ReadPin(K1_Port, K1_Pin) == 0 && HAL_GPIO_ReadPin(K3_Port, K3_Pin) == 0) || 
-      settings.self_ip_addr.addr == IPADDR_NONE || 
-        settings.self_ip_addr.addr == IPADDR_ANY) 
+  // Для версии прошивки "проверка пайки": Modbus отключен.
+  //modbus_tcp_start();
+  //modbus_rtu_start();
   {
     ip4_addr_set_u32(&settings.self_ip_addr, default_settings.self_ip_addr.addr);
     ip4_addr_set_u32(&settings.self_mask_addr, default_settings.self_mask_addr.addr);
@@ -604,6 +673,68 @@ void stroke(int8_t dir) {
       // open valve1 
       bitClear(mb_reg_urm, settings.valve1_io - 1);
       // close valve2
+static uint8_t uart_test_transfer(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, GPIO_TypeDef *tx_en_port, uint16_t tx_en_pin, GPIO_TypeDef *rx_en_port, uint16_t rx_en_pin, uint8_t configure_rx_first) {
+  static const uint8_t tx_packet[] = {0x55, 0xAA, 0x11, 0x22, 0x33, 0x44};
+  uint8_t rx_packet[sizeof(tx_packet)] = {0};
+
+  uart_test.running = 1;
+
+  HAL_UART_AbortReceive(tx_uart);
+  HAL_UART_AbortReceive(rx_uart);
+
+  if (configure_rx_first) {
+    HAL_Delay(3);
+  } else {
+    HAL_Delay(3);
+  }
+
+  HAL_GPIO_WritePin(tx_en_port, tx_en_pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(rx_en_port, rx_en_pin, GPIO_PIN_RESET);
+  HAL_Delay(1);
+
+  if (HAL_UART_Transmit(tx_uart, (uint8_t *)tx_packet, sizeof(tx_packet), 100) != HAL_OK) {
+    return 0;
+  }
+
+  if (HAL_UART_Receive(rx_uart, rx_packet, sizeof(rx_packet), 100) != HAL_OK) {
+    return 0;
+  }
+
+  return (memcmp(tx_packet, rx_packet, sizeof(tx_packet)) == 0) ? 1 : 0;
+}
+
+static void uart_test_run(void) {
+  uint8_t test_a;
+  uint8_t test_b;
+
+  uart_test.request = 0;
+  uart_test.done = 0;
+  uart_test.success = 0;
+  uart_test.running = 1;
+  strcpy(uart_test.message, "UART тест: выполняется");
+
+  test_a = uart_test_transfer(&huart1, &huart3, UART2_RE_DE_Port, UART2_RE_DE_Pin, UART1_RE_DE_Port, UART1_RE_DE_Pin, 1);
+  HAL_Delay(10);
+  test_b = uart_test_transfer(&huart3, &huart1, UART1_RE_DE_Port, UART1_RE_DE_Pin, UART2_RE_DE_Port, UART2_RE_DE_Pin, 0);
+
+  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
+
+  if (test_a && test_b) {
+    uart_test.success = 1;
+    strcpy(uart_test.message, "UART тест ОК: оба направления");
+  } else if (!test_a && !test_b) {
+    strcpy(uart_test.message, "UART FAIL: оба направления");
+  } else if (!test_a) {
+    strcpy(uart_test.message, "UART FAIL: USART1->USART3");
+  } else {
+    strcpy(uart_test.message, "UART FAIL: USART3->USART1");
+  }
+
+  uart_test.done = 1;
+  uart_test.running = 0;
+}
+
       bitClear(mb_reg_urm, settings.valve2_io - 1);
       break;
     }
@@ -659,6 +790,96 @@ uint16_t count_bits_set_parallel(uint64_t x) {
   x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0fUL;
   // returns left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ...
   return (x * 0x0101010101010101UL) >> 56;
+}
+
+static uint8_t uart_test_transfer(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, GPIO_TypeDef *tx_en_port, uint16_t tx_en_pin, GPIO_TypeDef *rx_en_port, uint16_t rx_en_pin, uint8_t configure_rx_first) {
+  static const uint8_t tx_packet[] = {0x55, 0xAA, 0x10, 0x20, 0x30, 0x40};
+  uint8_t rx_packet[sizeof(tx_packet)] = {0};
+
+  HAL_UART_AbortReceive(tx_uart);
+  HAL_UART_AbortReceive(rx_uart);
+
+  if (configure_rx_first) {
+    HAL_Delay(5);
+  } else {
+    HAL_Delay(5);
+  }
+
+  HAL_GPIO_WritePin(tx_en_port, tx_en_pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(rx_en_port, rx_en_pin, GPIO_PIN_RESET);
+  HAL_Delay(2);
+
+  if (HAL_UART_Transmit(tx_uart, (uint8_t *)tx_packet, sizeof(tx_packet), 100) != HAL_OK) {
+    return 0;
+  }
+
+  if (HAL_UART_Receive(rx_uart, rx_packet, sizeof(rx_packet), 100) != HAL_OK) {
+    if (uart_test.request && uart_test.running == 0) {
+      uart_test_run();
+    }
+
+    // В этой версии прошивки работаем только для теста UART (пайка), Modbus-логика отключена.
+    osDelayUntil(tick);
+    continue;
+
+    return 0;
+  }
+
+  HAL_Delay(2);
+  return (memcmp(tx_packet, rx_packet, sizeof(tx_packet)) == 0) ? 1 : 0;
+}
+
+static void uart_test_run(void) {
+  uint8_t test_a;
+  uint8_t test_b;
+
+  uart_test.request = 0;
+  uart_test.running = 1;
+  uart_test.done = 0;
+  uart_test.success = 0;
+  strcpy(uart_test.message, "Тест UART: выполняется");
+
+  if (ModbusRS2.myTaskModbusAHandle != NULL) {
+    vTaskSuspend(ModbusRS2.myTaskModbusAHandle);
+  }
+  if (ModbusRS1.myTaskModbusAHandle != NULL) {
+    vTaskSuspend(ModbusRS1.myTaskModbusAHandle);
+  }
+
+  test_a = uart_test_transfer(&huart1, &huart3, UART2_RE_DE_Port, UART2_RE_DE_Pin, UART1_RE_DE_Port, UART1_RE_DE_Pin, 1);
+  HAL_Delay(20);
+  test_b = uart_test_transfer(&huart3, &huart1, UART1_RE_DE_Port, UART1_RE_DE_Pin, UART2_RE_DE_Port, UART2_RE_DE_Pin, 0);
+
+  HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
+
+  if (test_a && test_b) {
+    uart_test.success = 1;
+    strcpy(uart_test.message, "UART тест ОК: USART1->USART3 и USART3->USART1");
+  } else {
+    uart_test.success = 0;
+    if (test_a == 0 && test_b == 0) {
+      strcpy(uart_test.message, "UART тест FAIL: оба направления");
+    } else if (test_a == 0) {
+      strcpy(uart_test.message, "UART тест FAIL: USART1->USART3");
+    } else {
+      strcpy(uart_test.message, "UART тест FAIL: USART3->USART1");
+    }
+  }
+
+  uart_test.done = 1;
+  uart_test.running = 0;
+
+  // Восстановить штатный прием Modbus после теста.
+  ModbusStart(&ModbusRS2);
+  ModbusStart(&ModbusRS1);
+
+  if (ModbusRS2.myTaskModbusAHandle != NULL) {
+    vTaskResume(ModbusRS2.myTaskModbusAHandle);
+  }
+  if (ModbusRS1.myTaskModbusAHandle != NULL) {
+    vTaskResume(ModbusRS1.myTaskModbusAHandle);
+  }
 }
 
 /**
@@ -740,6 +961,10 @@ static void main_task_thread(void *argument) {
 
     tick += pdMS_TO_TICKS(settings.mb_rate);
 
+    if (uart_test.request && uart_test.running == 0) {
+      uart_test_run();
+    }
+
     status = osMessageQueueGet(control_msg_queue, &control_id, NULL, 2U);
     if (status == osOK) {
       switch (control_id) {
@@ -764,6 +989,11 @@ static void main_task_thread(void *argument) {
     zap[0] = HAL_GetTick();
 #endif
     
+    if (uart_test.running) {
+      osDelayUntil(tick);
+      continue;
+    }
+
     // read pressure sensor1
     telegram_sensor_pressure.u8id = settings.sens1_id;
     telegram_sensor_pressure.u16reg = &mb_reg_pressure[MAINLINE];
