@@ -254,6 +254,64 @@ xhr.send();
 }, 1000);
 }
 
+function StartUartTest() {
+let button = document.getElementById("uart-test-button");
+if (button == null) {
+return;
+}
+
+button.disabled = true;
+
+let xhr = new XMLHttpRequest();
+xhr.open("GET", "/uart_test_start.json");
+xhr.timeout = 2000;
+xhr.onload = function() {
+if (xhr.status != 200) {
+button.disabled = false;
+alert("Не удалось запустить UART тест");
+return;
+}
+PollUartTest(button);
+};
+xhr.onerror = function() {
+button.disabled = false;
+alert("Ошибка запуска UART теста");
+};
+xhr.send();
+}
+
+function PollUartTest(button) {
+let timer = setInterval(function() {
+let xhr = new XMLHttpRequest();
+xhr.open("GET", "/uart_test_status.json");
+xhr.responseType = "json";
+xhr.timeout = 1500;
+xhr.onload = function() {
+if (xhr.status != 200) {
+return;
+}
+
+let resp = xhr.response;
+if (resp == null) {
+return;
+}
+
+if (resp.done == "1") {
+clearInterval(timer);
+button.disabled = false;
+if (resp.success == "1") {
+alert("UART тест завершен успешно. " + resp.message);
+}
+alert("UART тест завершен с ошибкой. " + resp.message);
+}
+}
+};
+xhr.onerror = function() {
+};
+xhr.send();
+}, 1000);
+}
+
 async function Set() {
 let settings_json = JSON.parse(window.sessionStorage.getItem("settings"));
 
