@@ -329,6 +329,53 @@ background-color: #dff2ef;
 <hr/>
 </div>
 
+
+<div id="frame5" class="frame" style="display: block;">
+<div class="elem0">
+<div class="left_col">Тест EEPROM</div>
+<div class="right_col"><button type="button">Проверить связь</button></div>
+</div>
+
+<div class="elem0">
+<div class="left_col">Тест клавиатуры</div>
+<div class="right_col"><button type="button">Запустить</button></div>
+</div>
+
+<div class="elem0">
+<div class="left_col">Тест watchdog</div>
+<div class="right_col"><button type="button">Запустить</button></div>
+</div>
+
+<div class="elem0">
+<div class="left_col">Тест UART</div>
+<div class="right_col"><button type="button">Запустить</button></div>
+</div>
+
+<div class="elem0">
+<div class="left_col">Состояние пинов</div>
+<div class="right_col"><button id="pins-toggle" type="button">Развернуть</button></div>
+</div>
+<div id="pins-content" class="hide">
+<div class="elem0">
+<div class="left_col">PIN 1</div>
+<div class="right_col">-</div>
+</div>
+<div class="elem0">
+<div class="left_col">PIN 2</div>
+<div class="right_col">-</div>
+</div>
+<div class="elem0">
+<div class="left_col">PIN 3</div>
+<div class="right_col">-</div>
+</div>
+<div class="elem0">
+<div class="left_col">PIN 4</div>
+<div class="right_col">-</div>
+</div>
+</div>
+<hr/>
+</div>
+
 <div style="width:100%;">
 <input type="button" id="save" onclick="SendSettings()" value="Сохранить">
 <input type="button" id="savefile" onclick="SaveFile()" value="Сохранить в файл">
@@ -340,6 +387,18 @@ background-color: #dff2ef;
 </body>
 
 <script>
+
+function initPinStateToggle() {
+	let pinsToggle = document.getElementById("pins-toggle");
+	let pinsContent = document.getElementById("pins-content");
+	if (pinsToggle != null && pinsContent != null) {
+		pinsToggle.addEventListener("click", function() {
+			pinsContent.classList.toggle("hide");
+			pinsToggle.innerHTML = pinsContent.classList.contains("hide") ? "Развернуть" : "Свернуть";
+		});
+	}
+}
+
 async function up() {
 	let count = 4;
 	for (let n = 1; n <= count; n++) {
@@ -357,6 +416,7 @@ async function up() {
 	}
 }
 up();
+initPinStateToggle();
 window.onload = function() {
 	State1();
 }
