@@ -786,6 +786,7 @@ static void main_task_thread(void *argument) {
   uart_test_state_t uart_test_state = UART_TEST_IDLE;
   const uint8_t uart_packet_a[6] = {0xA5, 0x5A, 0x01, 0x02, 0x03, 0x04};
   const uint8_t uart_packet_b[6] = {0x3C, 0xC3, 0x10, 0x20, 0x30, 0x40};
+  uint32_t uart_test_modbus_resume_tick = 0;
   
   control_type_t control_id = CTRL_UNDEFINED;
   
@@ -848,9 +849,11 @@ static void main_task_thread(void *argument) {
       }
       uart_test_ready = 1;
       uart_test_state = UART_TEST_DONE;
+      uart_test_modbus_resume_tick = osKernelGetTickCount() + pdMS_TO_TICKS(30000U);
     }
 
-    if (uart_test_state == UART_TEST_RUN) {
+    if ((uart_test_state == UART_TEST_RUN) ||
+        ((uart_test_state == UART_TEST_DONE) && ((int32_t)(osKernelGetTickCount() - uart_test_modbus_resume_tick) < 0))) {
       osDelay(20);
       continue;
     }
