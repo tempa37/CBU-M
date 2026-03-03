@@ -4,6 +4,9 @@
 #include "main.h"
 #include "Modbus.h"
 
+void uart_test_on_tx_cplt_from_isr(UART_HandleTypeDef *huart, BaseType_t *xHigherPriorityTaskWoken);
+void uart_test_on_rx_cplt_from_isr(UART_HandleTypeDef *huart, BaseType_t *xHigherPriorityTaskWoken);
+
 /**
 * @brief
 * This is the callback for HAL interrupts of UART TX used by Modbus library.
@@ -15,7 +18,7 @@
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
   // Modbus RTU TX callback BEGIN
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;  
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   for (uint8_t i = 0; i < numberHandlers; i++) {
     if (mHandlers[i]->port == huart) {
       // notify the end of TX
@@ -23,10 +26,10 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
       break;
     }
   }
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU TX callback END
-  
-  // Here you should implement the callback code for other UARTs not used by Modbus
+
+  uart_test_on_tx_cplt_from_isr(huart, &xHigherPriorityTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 /**
@@ -51,10 +54,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
       break;
     }
   }
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU RX callback END
-  
-  // Here you should implement the callback code for other UARTs not used by Modbus
+
+  uart_test_on_rx_cplt_from_isr(UartHandle, &xHigherPriorityTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 #if ENABLE_USART_DMA == 1
