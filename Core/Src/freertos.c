@@ -35,6 +35,7 @@
 #include "flash_if.h"
 #include "version.h"
 #include "tim.h"
+#include "usart.h"
 #include "menu.h"
 #include "keyboard.h"
 
@@ -689,6 +690,14 @@ static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
   HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, tx3 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
+static void uart_test_reinit(void) {
+  HAL_UART_DeInit(&huart1);
+  HAL_UART_DeInit(&huart3);
+
+  MX_USART1_UART_Init();
+  MX_USART3_UART_Init();
+}
+
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
   uint8_t rx_buf[8] = {0};
 
@@ -824,6 +833,8 @@ static void main_task_thread(void *argument) {
     }
 
     if (uart_test_state == UART_TEST_RUN) {
+      uart_test_reinit();
+
       uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
       if (uart_test_ok) {
         osDelay(50);
