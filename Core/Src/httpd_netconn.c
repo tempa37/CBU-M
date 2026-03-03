@@ -14,9 +14,6 @@
 #include "global_types.h"
 #include "manage_settings.h"
 
-// modbus master/slave rtu, tcp
-#include "Modbus.h"
-
 // for function mktime() & difftime()
 //#include <time.h>
 
@@ -184,9 +181,6 @@ osSemaphoreId_t httpdSemaphore;
 
 extern osSemaphoreId_t flash_semaphore;
 
-//extern modbusHandler_t ModbusTCPm;
-extern modbusHandler_t ModbusRS1;
-extern modbusHandler_t ModbusRS2;
 extern volatile uint8_t uart_test_request;
 extern volatile uint8_t uart_test_ready;
 extern volatile uint8_t uart_test_ok;
@@ -820,9 +814,7 @@ static void http_server(struct netconn *conn) {
             // ignore
           } else if (ret == STATUS_INPROGRESS) {
             
-            //osThreadSuspend(ModbusTCPm.myTaskModbusAHandle);
-            osThreadSuspend(ModbusRS2.myTaskModbusAHandle);
-            osThreadSuspend(ModbusRS1.myTaskModbusAHandle);
+            // Modbus RTU tasks removed: nothing to suspend here.
             
             // Don't close the connection!
 

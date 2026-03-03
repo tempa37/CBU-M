@@ -45,6 +45,11 @@ void MX_USART3_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
+HAL_StatusTypeDef UART_RS485_SetDirection(UART_HandleTypeDef *huart, uint8_t tx_enable);
+HAL_StatusTypeDef UART_SendPacket(UART_HandleTypeDef *huart, const uint8_t *data, uint16_t len, uint32_t timeout);
+HAL_StatusTypeDef UART_ReceivePacket(UART_HandleTypeDef *huart, uint8_t *data, uint16_t len, uint32_t timeout);
+HAL_StatusTypeDef UART_SendReceivePacket(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx_uart1, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len, uint32_t tx_timeout, uint32_t rx_timeout);
+
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
@@ -52,4 +57,3 @@ void MX_USART3_UART_Init(void);
 #endif
 
 #endif /* __USART_H__ */
-
