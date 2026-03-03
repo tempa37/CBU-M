@@ -685,7 +685,7 @@ uint16_t count_bits_set_parallel(uint64_t x) {
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
   HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_SET);
-
+  HAL_Delay(20);
   HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, tx1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
   HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, tx3 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
@@ -693,7 +693,7 @@ static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
 static void uart_test_reinit(void) {
   HAL_UART_DeInit(&huart1);
   HAL_UART_DeInit(&huart3);
-
+  HAL_Delay(20);
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
 }
@@ -715,7 +715,7 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
 
   osDelay(10);
 
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 150) != HAL_OK) {
+  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
     return;
