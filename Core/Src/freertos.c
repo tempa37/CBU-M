@@ -635,13 +635,13 @@ static void uart_test_reinit(void) {
   MX_USART3_UART_Init();
 }
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+void UART_User_RxCpltCallback(UART_HandleTypeDef *huart) {
   if (uart_test_rx_handle != NULL && huart == uart_test_rx_handle) {
     uart_test_rx_done = 1;
   }
 }
 
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+void UART_User_ErrorCallback(UART_HandleTypeDef *huart) {
   if (uart_test_rx_handle != NULL && huart == uart_test_rx_handle) {
     uart_test_rx_error = 1;
   }

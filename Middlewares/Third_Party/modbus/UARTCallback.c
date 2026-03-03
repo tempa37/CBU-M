@@ -4,6 +4,9 @@
 #include "main.h"
 #include "Modbus.h"
 
+extern void UART_User_RxCpltCallback(UART_HandleTypeDef *huart);
+extern void UART_User_ErrorCallback(UART_HandleTypeDef *huart);
+
 /**
 * @brief
 * This is the callback for HAL interrupts of UART TX used by Modbus library.
@@ -55,6 +58,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
   // Modbus RTU RX callback END
   
   // Here you should implement the callback code for other UARTs not used by Modbus
+  UART_User_RxCpltCallback(UartHandle);
 }
 
 #if ENABLE_USART_DMA == 1
@@ -76,6 +80,8 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
       break;
     }
   }
+
+  UART_User_ErrorCallback(huart);
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
