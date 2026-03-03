@@ -276,11 +276,28 @@ if (btn != null) {
 btn.disabled = true;
 }
 let xhr = new XMLHttpRequest();
-xhr.open("GET", "/uart_test_start", true);
-xhr.timeout = 2000;
+xhr.open("GET", "/uart_test.json", true);
+xhr.timeout = 5000;
 xhr.onload = function() {
 if (xhr.status == 200) {
-PollUartTestResult();
+let data = {};
+try {
+data = JSON.parse(xhr.responseText);
+} catch (e) {
+if (btn != null) {
+btn.disabled = false;
+}
+alert("UART тест: ошибка формата ответа");
+return;
+}
+if (btn != null) {
+btn.disabled = false;
+}
+if (data.ok == 1) {
+alert("UART тест пройден: UART1->UART3=" + data.uart1_to_uart3 + ", UART3->UART1=" + data.uart3_to_uart1);
+} else {
+alert("UART тест не пройден: UART1->UART3=" + data.uart1_to_uart3 + ", UART3->UART1=" + data.uart3_to_uart1 + ". " + data.message);
+}
 } else {
 if (btn != null) {
 btn.disabled = false;
@@ -295,54 +312,4 @@ btn.disabled = false;
 alert("Ошибка запроса запуска UART теста");
 };
 xhr.send();
-}
-
-function PollUartTestResult() {
-let btn = document.getElementById("uart-test-btn");
-let retries = 30;
-let timer = setInterval(function() {
-let xhr = new XMLHttpRequest();
-xhr.open("GET", "/uart_test_result", true);
-xhr.timeout = 2000;
-xhr.onload = function() {
-if (xhr.status == 200 && xhr.responseText.length > 0) {
-let data = {};
-try {
-data = JSON.parse(xhr.responseText);
-} catch (e) {
-return;
-}
-if (data.ready == 1) {
-clearInterval(timer);
-if (btn != null) {
-btn.disabled = false;
-}
-if (data.ok == 1) {
-alert("UART тест пройден: " + data.message);
-} else {
-alert("UART тест не пройден: " + data.message);
-}
-}
-}
-};
-xhr.onerror = function() {
-retries--;
-if (retries <= 0) {
-clearInterval(timer);
-if (btn != null) {
-btn.disabled = false;
-}
-alert("UART тест: нет ответа");
-}
-};
-xhr.send();
-retries--;
-if (retries <= 0) {
-clearInterval(timer);
-if (btn != null) {
-btn.disabled = false;
-}
-alert("UART тест: превышено время ожидания");
-}
-}, 1000);
 }
