@@ -224,6 +224,7 @@ uint16_t ModbusDATA_Slave[64];
 volatile uint8_t uart_test_request = 0;
 volatile uint8_t uart_test_ready = 0;
 volatile uint8_t uart_test_ok = 0;
+volatile uint8_t modbus_rtu_tx_enabled = 0;
 volatile uint8_t uart_test_active = 0;
 UART_HandleTypeDef *uart_test_tx_handle = NULL;
 UART_HandleTypeDef *uart_test_rx_handle = NULL;
@@ -888,70 +889,71 @@ static void main_task_thread(void *argument) {
       continue;
     }
 
+    if (modbus_rtu_tx_enabled) {
 #ifdef DEBUG
-    WM_Scheduler = uxTaskGetStackHighWaterMark(NULL);
-    zap[0] = HAL_GetTick();
+      WM_Scheduler = uxTaskGetStackHighWaterMark(NULL);
+      zap[0] = HAL_GetTick();
 #endif
-    
-    // read pressure sensor1
-    telegram_sensor_pressure.u8id = settings.sens1_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[MAINLINE];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
+      
+      // read pressure sensor1
+      telegram_sensor_pressure.u8id = settings.sens1_id;
+      telegram_sensor_pressure.u16reg = &mb_reg_pressure[MAINLINE];
+      
+      notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
 
 #ifdef DEBUG
-    zap[1] = HAL_GetTick();
-    zap[2] = zap[1] - zap[0];  
+      zap[1] = HAL_GetTick();
+      zap[2] = zap[1] - zap[0];  
 #endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_ONLINE;
-        
-        oled_msg.pressure_sensor[MAINLINE].value = mb_reg_pressure[MAINLINE] / 100.0f;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-    
-#ifdef DEBUG
-    zap[3] = HAL_GetTick();
-#endif
-    
-    // read pressure sensor2
-    telegram_sensor_pressure.u8id = settings.sens2_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[HYDRAULIC];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[4] = HAL_GetTick();
-    zap[5] = zap[4] - zap[3];
-#endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_NORMAL;
-        
-        oled_msg.pressure_sensor[HYDRAULIC].value = mb_reg_pressure[HYDRAULIC] / 100.0f;
-        
-        // pressure outside the working range?
-        if (mb_reg_pressure[HYDRAULIC] < settings.sens2_min_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_BELOW_NORMAL;
-        } else if (mb_reg_pressure[HYDRAULIC] > settings.sens2_max_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_ABOVE_NORMAL;
+      
+      if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
+        if (notification != MB_ERR_OK) {
+          oled_msg.pressure_sensor[MAINLINE].state = STATE_OFFLINE;
+        } else {
+          oled_msg.pressure_sensor[MAINLINE].state = STATE_ONLINE;
+          
+          oled_msg.pressure_sensor[MAINLINE].value = mb_reg_pressure[MAINLINE] / 100.0f;
         }
+        osSemaphoreRelease(msgSemaphore);
       }
-      osSemaphoreRelease(msgSemaphore);
-    }
+      
+#ifdef DEBUG
+      zap[3] = HAL_GetTick();
+#endif
+      
+      // read pressure sensor2
+      telegram_sensor_pressure.u8id = settings.sens2_id;
+      telegram_sensor_pressure.u16reg = &mb_reg_pressure[HYDRAULIC];
+      
+      notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
 
 #ifdef DEBUG
-    zap[6] = HAL_GetTick();
+      zap[4] = HAL_GetTick();
+      zap[5] = zap[4] - zap[3];
+#endif
+      
+      if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
+        if (notification != MB_ERR_OK) {
+          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_OFFLINE;
+        } else {
+          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_NORMAL;
+          
+          oled_msg.pressure_sensor[HYDRAULIC].value = mb_reg_pressure[HYDRAULIC] / 100.0f;
+          
+          // pressure outside the working range?
+          if (mb_reg_pressure[HYDRAULIC] < settings.sens2_min_val) {
+            // error
+            oled_msg.pressure_sensor[HYDRAULIC].state = STATE_BELOW_NORMAL;
+          } else if (mb_reg_pressure[HYDRAULIC] > settings.sens2_max_val) {
+            // error
+            oled_msg.pressure_sensor[HYDRAULIC].state = STATE_ABOVE_NORMAL;
+          }
+        }
+        osSemaphoreRelease(msgSemaphore);
+      }
+
+#ifdef DEBUG
+      zap[6] = HAL_GetTick();
 #endif
 
 /*    
@@ -967,20 +969,20 @@ static void main_task_thread(void *argument) {
     }
 */
 
-    notification = modbus_query(&ModbusRS2, &telegram_urm, 2);
+      notification = modbus_query(&ModbusRS2, &telegram_urm, 2);
 
 #ifdef DEBUG
     zap[7] = HAL_GetTick();
     zap[8] = zap[7] - zap[6];
 #endif
     
-    if (notification != MB_ERR_OK) {
-      oled_msg.valve.state = STATE_OFFLINE;
-      oled_msg.urm_state = STATE_OFFLINE;
-    } else {
-      oled_msg.valve.state = STATE_ONLINE;
-      oled_msg.urm_state = STATE_ONLINE;
-    }
+      if (notification != MB_ERR_OK) {
+        oled_msg.valve.state = STATE_OFFLINE;
+        oled_msg.urm_state = STATE_OFFLINE;
+      } else {
+        oled_msg.valve.state = STATE_ONLINE;
+        oled_msg.urm_state = STATE_ONLINE;
+      }
     
     //mb_reg_urm = 0;
     
@@ -988,24 +990,25 @@ static void main_task_thread(void *argument) {
     zap[9] = HAL_GetTick();
 #endif
 
-    // read displacement sensor and start signal
-    notification = modbus_query(&ModbusRS2, &telegram_umvh, 2);
+      // read displacement sensor and start signal
+      notification = modbus_query(&ModbusRS2, &telegram_umvh, 2);
 
 #ifdef DEBUG
     zap[10] = HAL_GetTick();
     zap[11] = zap[10] - zap[9];
 #endif
 
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      // offline
-      if (notification != MB_ERR_OK) {
-        oled_msg.umvh_state = STATE_OFFLINE;
-        oled_msg.position_state = STATE_OFFLINE;
-      } else {
-        oled_msg.umvh_state = STATE_ONLINE;
-        oled_msg.position_state = STATE_ONLINE;
+      if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
+        // offline
+        if (notification != MB_ERR_OK) {
+          oled_msg.umvh_state = STATE_OFFLINE;
+          oled_msg.position_state = STATE_OFFLINE;
+        } else {
+          oled_msg.umvh_state = STATE_ONLINE;
+          oled_msg.position_state = STATE_ONLINE;
+        }
+        osSemaphoreRelease(msgSemaphore);
       }
-      osSemaphoreRelease(msgSemaphore);
     }
     
     if (osSemaphoreAcquire(valve_controlSemaphore, 2) == osOK) {
