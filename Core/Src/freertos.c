@@ -222,8 +222,12 @@ modbusHandler_t ModbusTCPs;
 uint16_t ModbusDATA_Slave[64];
 
 static const uint8_t uart_test_magic[4] = {0xA5, 0x5A, 0x3C, 0xC3};
-static uint8_t uart_test_rx1[4];
-static uint8_t uart_test_rx3[4];
+static uint8_t uart_test_rx_it1[4];
+static uint8_t uart_test_rx_it3[4];
+static uint8_t uart_test_rx_copy1[4];
+static uint8_t uart_test_rx_copy3[4];
+static volatile uint8_t uart_test_rx_ready1 = 0;
+static volatile uint8_t uart_test_rx_ready3 = 0;
 static volatile uint8_t uart_test_mask = 0;
 static volatile uint8_t uart_test_done = 0;
 static volatile uint8_t uart_test_stage = 0;
@@ -242,6 +246,7 @@ static void main_task_thread(void *argument);
 static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3);
+static void uart_test_full_reset(void);
 static void uart_test_start_stage(uint8_t stage);
 bool uart_test_run(uint32_t timeout_ms, uint8_t *result_mask);
 bool uart_test_handle_rx(UART_HandleTypeDef *huart);
@@ -639,12 +644,27 @@ static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
   HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, tx3 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
+static void uart_test_full_reset(void) {
+  HAL_UART_Abort(&huart1);
+  HAL_UART_Abort(&huart3);
+  HAL_UART_DeInit(&huart1);
+  HAL_UART_DeInit(&huart3);
+  HAL_Delay(20);
+  MX_USART1_UART_Init();
+  MX_USART3_UART_Init();
+  HAL_Delay(20);
+}
+
 static void uart_test_start_stage(uint8_t stage) {
   uart_test_stage = stage;
+  uart_test_full_reset();
+
   if (stage == 0) {
     uart_test_set_rs485(1, 0);
-    memset(uart_test_rx3, 0, sizeof(uart_test_rx3));
-    if (HAL_UART_Receive_IT(&huart3, uart_test_rx3, sizeof(uart_test_rx3)) != HAL_OK) {
+    uart_test_rx_ready3 = 0;
+    memset(uart_test_rx_it3, 0, sizeof(uart_test_rx_it3));
+    memset(uart_test_rx_copy3, 0, sizeof(uart_test_rx_copy3));
+    if (HAL_UART_Receive_IT(&huart3, uart_test_rx_it3, sizeof(uart_test_rx_it3)) != HAL_OK) {
       uart_test_done = 1;
       return;
     }
@@ -653,8 +673,10 @@ static void uart_test_start_stage(uint8_t stage) {
     }
   } else {
     uart_test_set_rs485(0, 1);
-    memset(uart_test_rx1, 0, sizeof(uart_test_rx1));
-    if (HAL_UART_Receive_IT(&huart1, uart_test_rx1, sizeof(uart_test_rx1)) != HAL_OK) {
+    uart_test_rx_ready1 = 0;
+    memset(uart_test_rx_it1, 0, sizeof(uart_test_rx_it1));
+    memset(uart_test_rx_copy1, 0, sizeof(uart_test_rx_copy1));
+    if (HAL_UART_Receive_IT(&huart1, uart_test_rx_it1, sizeof(uart_test_rx_it1)) != HAL_OK) {
       uart_test_done = 1;
       return;
     }
@@ -671,6 +693,8 @@ bool uart_test_run(uint32_t timeout_ms, uint8_t *result_mask) {
   uart_test_done = 0;
   uart_test_stage = 0;
   uart_test_stage2_pending = 0;
+  uart_test_rx_ready1 = 0;
+  uart_test_rx_ready3 = 0;
   uart_test_active = 1;
 
   uart_test_start_stage(0);
@@ -678,7 +702,7 @@ bool uart_test_run(uint32_t timeout_ms, uint8_t *result_mask) {
   while (!uart_test_done && (HAL_GetTick() - start_tick) < timeout_ms) {
     if (uart_test_stage2_pending) {
       uart_test_stage2_pending = 0;
-      HAL_Delay(10);
+      HAL_Delay(100);
       uart_test_start_stage(1);
     }
     osDelay(1);
@@ -701,7 +725,9 @@ bool uart_test_handle_rx(UART_HandleTypeDef *huart) {
   }
 
   if ((huart == &huart3) && (uart_test_stage == 0)) {
-    if (memcmp(uart_test_rx3, uart_test_magic, sizeof(uart_test_magic)) == 0) {
+    memcpy(uart_test_rx_copy3, uart_test_rx_it3, sizeof(uart_test_rx_copy3));
+    uart_test_rx_ready3 = 1;
+    if (memcmp(uart_test_rx_copy3, uart_test_magic, sizeof(uart_test_magic)) == 0) {
       uart_test_mask |= 0x01;
     }
     uart_test_stage2_pending = 1;
@@ -709,7 +735,9 @@ bool uart_test_handle_rx(UART_HandleTypeDef *huart) {
   }
 
   if ((huart == &huart1) && (uart_test_stage == 1)) {
-    if (memcmp(uart_test_rx1, uart_test_magic, sizeof(uart_test_magic)) == 0) {
+    memcpy(uart_test_rx_copy1, uart_test_rx_it1, sizeof(uart_test_rx_copy1));
+    uart_test_rx_ready1 = 1;
+    if (memcmp(uart_test_rx_copy1, uart_test_magic, sizeof(uart_test_magic)) == 0) {
       uart_test_mask |= 0x02;
     }
     uart_test_done = 1;
