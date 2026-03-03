@@ -276,73 +276,38 @@ if (btn != null) {
 btn.disabled = true;
 }
 let xhr = new XMLHttpRequest();
-xhr.open("GET", "/uart_test_start", true);
-xhr.timeout = 2000;
+xhr.open("GET", "/uart_test.json", true);
+xhr.timeout = 3000;
 xhr.onload = function() {
-if (xhr.status == 200) {
-PollUartTestResult();
-} else {
 if (btn != null) {
 btn.disabled = false;
 }
-alert("Не удалось запустить UART тест");
-}
-};
-xhr.onerror = function() {
-if (btn != null) {
-btn.disabled = false;
-}
-alert("Ошибка запроса запуска UART теста");
-};
-xhr.send();
-}
-
-function PollUartTestResult() {
-let btn = document.getElementById("uart-test-btn");
-let retries = 30;
-let timer = setInterval(function() {
-let xhr = new XMLHttpRequest();
-xhr.open("GET", "/uart_test_result", true);
-xhr.timeout = 2000;
-xhr.onload = function() {
 if (xhr.status == 200 && xhr.responseText.length > 0) {
 let data = {};
 try {
 data = JSON.parse(xhr.responseText);
 } catch (e) {
+alert("UART тест: некорректный ответ");
 return;
 }
-if (data.ready == 1) {
-clearInterval(timer);
-if (btn != null) {
-btn.disabled = false;
-}
+let msg = "UART1->UART2: " + (data.uart1_to_uart2 ? "OK" : "FAIL") + "\n" +
+"UART2->UART1: " + (data.uart2_to_uart1 ? "OK" : "FAIL");
 if (data.ok == 1) {
-alert("UART тест пройден: " + data.message);
+alert("UART тест пройден\n" + msg);
 } else {
-alert("UART тест не пройден: " + data.message);
+alert("UART тест не пройден\n" + msg);
 }
-}
+} else {
+alert("Не удалось выполнить UART тест");
 }
 };
 xhr.onerror = function() {
-retries--;
-if (retries <= 0) {
-clearInterval(timer);
 if (btn != null) {
 btn.disabled = false;
 }
-alert("UART тест: нет ответа");
-}
+alert("Ошибка запроса UART теста");
 };
 xhr.send();
-retries--;
-if (retries <= 0) {
-clearInterval(timer);
-if (btn != null) {
-btn.disabled = false;
 }
-alert("UART тест: превышено время ожидания");
-}
-}, 1000);
-}
+
+
