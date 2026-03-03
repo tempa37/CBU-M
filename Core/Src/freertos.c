@@ -689,6 +689,24 @@ static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
   HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, tx3 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
+static uint8_t uart_test_reinit(UART_HandleTypeDef *uart, const char *name) {
+  HAL_StatusTypeDef st;
+
+  st = HAL_UART_DeInit(uart);
+  if (st != HAL_OK) {
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка деинициализации (st=%d)", name, st);
+    return 0;
+  }
+
+  st = HAL_UART_Init(uart);
+  if (st != HAL_OK) {
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка инициализации (st=%d)", name, st);
+    return 0;
+  }
+
+  return 1;
+}
+
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
   uint8_t rx_buf[8] = {0};
 
@@ -824,6 +842,19 @@ static void main_task_thread(void *argument) {
     }
 
     if (uart_test_state == UART_TEST_RUN) {
+      if (!uart_test_reinit(&huart1, "UART1") || !uart_test_reinit(&huart3, "UART3")) {
+        uart_test_ok = 0;
+      }
+
+      if (!uart_test_ok) {
+        uart_test_set_rs485(0, 0);
+        HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
+        uart_test_ready = 1;
+        uart_test_state = UART_TEST_DONE;
+        continue;
+      }
+
       uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
       if (uart_test_ok) {
         osDelay(50);
