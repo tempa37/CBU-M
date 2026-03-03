@@ -4,6 +4,19 @@
 #include "main.h"
 #include "Modbus.h"
 
+extern volatile TaskHandle_t uart_test_task_handle;
+extern volatile uint8_t uart_test_active;
+extern volatile uint16_t uart_test_rx_size_uart1;
+extern volatile uint16_t uart_test_rx_size_uart3;
+extern UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart3;
+
+#define UART_TEST_NOTIFY_TX1   (1UL << 0)
+#define UART_TEST_NOTIFY_TX3   (1UL << 1)
+#define UART_TEST_NOTIFY_RX1   (1UL << 2)
+#define UART_TEST_NOTIFY_RX3   (1UL << 3)
+#define UART_TEST_NOTIFY_ERROR (1UL << 4)
+
 /**
 * @brief
 * This is the callback for HAL interrupts of UART TX used by Modbus library.
@@ -23,6 +36,14 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
       break;
     }
   }
+  if (uart_test_active && uart_test_task_handle != NULL) {
+    if (huart == &huart1) {
+      xTaskNotifyFromISR((TaskHandle_t)uart_test_task_handle, UART_TEST_NOTIFY_TX1, eSetBits, &xHigherPriorityTaskWoken);
+    } else if (huart == &huart3) {
+      xTaskNotifyFromISR((TaskHandle_t)uart_test_task_handle, UART_TEST_NOTIFY_TX3, eSetBits, &xHigherPriorityTaskWoken);
+    }
+  }
+
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU TX callback END
   
@@ -64,6 +85,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
 // handled by the HAL
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+  if (uart_test_active && uart_test_task_handle != NULL) {
+    xTaskNotifyFromISR((TaskHandle_t)uart_test_task_handle, UART_TEST_NOTIFY_ERROR, eSetBits, &xHigherPriorityTaskWoken);
+  }
+
   for (uint8_t i = 0; i < numberHandlers; i++) {
     if (mHandlers[i]->port == huart) {
       if (mHandlers[i]->xTypeHW == USART_HW_DMA) {
@@ -76,12 +103,24 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
       break;
     }
   }
+
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   HAL_UART_RxEventTypeTypeDef rxEventType = HAL_UARTEx_GetRxEventType(huart);
   if (rxEventType == HAL_UART_RXEVENT_IDLE) {
+    if (uart_test_active && uart_test_task_handle != NULL) {
+      if (huart == &huart1) {
+        uart_test_rx_size_uart1 = Size;
+        xTaskNotifyFromISR((TaskHandle_t)uart_test_task_handle, UART_TEST_NOTIFY_RX1, eSetBits, &xHigherPriorityTaskWoken);
+      } else if (huart == &huart3) {
+        uart_test_rx_size_uart3 = Size;
+        xTaskNotifyFromISR((TaskHandle_t)uart_test_task_handle, UART_TEST_NOTIFY_RX3, eSetBits, &xHigherPriorityTaskWoken);
+      }
+    }
+
     // Modbus RTU RX callback BEGIN
     for (uint8_t i = 0; i < numberHandlers; i++) {
       if (mHandlers[i]->port == huart) {
