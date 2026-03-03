@@ -698,6 +698,24 @@ static void uart_test_reinit(void) {
   MX_USART3_UART_Init();
 }
 
+static void uart_test_modbus_pause(void) {
+  if (ModbusRS2.myTaskModbusAHandle != NULL) {
+    osThreadSuspend(ModbusRS2.myTaskModbusAHandle);
+  }
+  if (ModbusRS1.myTaskModbusAHandle != NULL) {
+    osThreadSuspend(ModbusRS1.myTaskModbusAHandle);
+  }
+}
+
+static void uart_test_modbus_resume(void) {
+  if (ModbusRS2.myTaskModbusAHandle != NULL) {
+    osThreadResume(ModbusRS2.myTaskModbusAHandle);
+  }
+  if (ModbusRS1.myTaskModbusAHandle != NULL) {
+    osThreadResume(ModbusRS1.myTaskModbusAHandle);
+  }
+}
+
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
   uint8_t rx_buf[8] = {0};
 
@@ -833,6 +851,7 @@ static void main_task_thread(void *argument) {
     }
 
     if (uart_test_state == UART_TEST_RUN) {
+      uart_test_modbus_pause();
       uart_test_reinit();
 
       uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
@@ -846,6 +865,8 @@ static void main_task_thread(void *argument) {
       if (uart_test_ok) {
         snprintf(uart_test_message, sizeof(uart_test_message), "UART1<->UART3 OK");
       }
+      uart_test_reinit();
+      uart_test_modbus_resume();
       uart_test_ready = 1;
       uart_test_state = UART_TEST_DONE;
     }
