@@ -185,8 +185,6 @@ osSemaphoreId_t httpdSemaphore;
 extern osSemaphoreId_t flash_semaphore;
 
 //extern modbusHandler_t ModbusTCPm;
-extern modbusHandler_t ModbusRS1;
-extern modbusHandler_t ModbusRS2;
 extern volatile uint8_t uart_test_request;
 extern volatile uint8_t uart_test_ready;
 extern volatile uint8_t uart_test_ok;
@@ -819,10 +817,6 @@ static void http_server(struct netconn *conn) {
           if (ret == STATUS_NONE) {
             // ignore
           } else if (ret == STATUS_INPROGRESS) {
-            
-            //osThreadSuspend(ModbusTCPm.myTaskModbusAHandle);
-            osThreadSuspend(ModbusRS2.myTaskModbusAHandle);
-            osThreadSuspend(ModbusRS1.myTaskModbusAHandle);
             
             // Don't close the connection!
 

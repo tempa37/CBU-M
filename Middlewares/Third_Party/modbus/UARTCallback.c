@@ -4,6 +4,14 @@
 #include "main.h"
 #include "Modbus.h"
 
+extern volatile TaskHandle_t uart_test_task;
+extern volatile UART_HandleTypeDef *uart_test_tx_uart;
+extern volatile UART_HandleTypeDef *uart_test_rx_uart;
+extern volatile uint16_t uart_test_rx_size;
+
+#define UART_TEST_EVT_TX_DONE (1UL << 0)
+#define UART_TEST_EVT_RX_DONE (1UL << 1)
+
 /**
 * @brief
 * This is the callback for HAL interrupts of UART TX used by Modbus library.
@@ -23,9 +31,14 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
       break;
     }
   }
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU TX callback END
-  
+
+  if (uart_test_task != NULL && uart_test_tx_uart == huart) {
+    xTaskNotifyFromISR((TaskHandle_t)uart_test_task, UART_TEST_EVT_TX_DONE, eSetBits, &xHigherPriorityTaskWoken);
+  }
+
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+
   // Here you should implement the callback code for other UARTs not used by Modbus
 }
 
@@ -51,6 +64,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
       break;
     }
   }
+  if (uart_test_task != NULL && uart_test_rx_uart == UartHandle) {
+    uart_test_rx_size = 1;
+    xTaskNotifyFromISR((TaskHandle_t)uart_test_task, UART_TEST_EVT_RX_DONE, eSetBits, &xHigherPriorityTaskWoken);
+  }
+
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU RX callback END
   
@@ -81,6 +99,11 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   HAL_UART_RxEventTypeTypeDef rxEventType = HAL_UARTEx_GetRxEventType(huart);
+  if (uart_test_task != NULL && uart_test_rx_uart == huart && Size) {
+    uart_test_rx_size = Size;
+    xTaskNotifyFromISR((TaskHandle_t)uart_test_task, UART_TEST_EVT_RX_DONE, eSetBits, &xHigherPriorityTaskWoken);
+  }
+
   if (rxEventType == HAL_UART_RXEVENT_IDLE) {
     // Modbus RTU RX callback BEGIN
     for (uint8_t i = 0; i < numberHandlers; i++) {
