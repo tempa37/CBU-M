@@ -42,6 +42,7 @@
 #include "manage_settings.h"
 #include "ring_line.h"
 #include <stdio.h>
+#include "task.h"
 
 /* USER CODE END Includes */
 
@@ -232,6 +233,16 @@ typedef enum {
   UART_TEST_DONE,
 } uart_test_state_t;
 
+#define UART_TEST_EVT_UART1_TX (1UL << 0)
+#define UART_TEST_EVT_UART3_TX (1UL << 1)
+#define UART_TEST_EVT_UART1_RX (1UL << 2)
+#define UART_TEST_EVT_UART3_RX (1UL << 3)
+
+static uint8_t uart_test_rx_buf_1[32] = {0};
+static uint8_t uart_test_rx_buf_3[32] = {0};
+static volatile uint16_t uart_test_rx_len_1 = 0;
+static volatile uint16_t uart_test_rx_len_3 = 0;
+
 /* USER CODE END Variables */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -245,7 +256,10 @@ static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3);
+static void uart_test_prepare_rx(UART_HandleTypeDef *rx_uart, uint16_t len);
+static uint32_t uart_test_get_bits(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart);
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok);
+uint32_t uart_test_notify_from_isr(UART_HandleTypeDef *huart, uint8_t tx_done, uint16_t rx_size);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -331,7 +345,7 @@ void MX_FREERTOS_Init(void) {
  
   modbus_tcp_start();
   //
-  modbus_rtu_start();
+  //modbus_rtu_start(); // UART RTU path disabled for UART self-test runtime.
 
   main_task_handle = osThreadNew(main_task_thread, NULL, &main_task_handle_attr);
   ring_line_task_handle = osThreadNew(ring_line_thread, NULL, &ring_line_task_handle_attr);
@@ -682,6 +696,33 @@ uint16_t count_bits_set_parallel(uint64_t x) {
  * @retval None
  */
 
+uint32_t uart_test_notify_from_isr(UART_HandleTypeDef *huart, uint8_t tx_done, uint16_t rx_size) {
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  uint32_t bit = 0;
+
+  if (huart == &huart1) {
+    if (tx_done) {
+      bit = UART_TEST_EVT_UART1_TX;
+    } else {
+      uart_test_rx_len_1 = rx_size;
+      bit = UART_TEST_EVT_UART1_RX;
+    }
+  } else if (huart == &huart3) {
+    if (tx_done) {
+      bit = UART_TEST_EVT_UART3_TX;
+    } else {
+      uart_test_rx_len_3 = rx_size;
+      bit = UART_TEST_EVT_UART3_RX;
+    }
+  }
+
+  if (bit != 0 && main_task_handle != NULL) {
+    xTaskNotifyFromISR(main_task_handle, bit, eSetBits, &xHigherPriorityTaskWoken);
+  }
+
+  return (uint32_t)xHigherPriorityTaskWoken;
+}
+
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
   HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_SET);
@@ -698,130 +739,85 @@ static void uart_test_reinit(void) {
   MX_USART3_UART_Init();
 }
 
+static void uart_test_prepare_rx(UART_HandleTypeDef *rx_uart, uint16_t len) {
+  if (rx_uart == &huart1) {
+    uart_test_rx_len_1 = 0;
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_test_rx_buf_1, len);
+    __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
+  } else if (rx_uart == &huart3) {
+    uart_test_rx_len_3 = 0;
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uart_test_rx_buf_3, len);
+    __HAL_DMA_DISABLE_IT(huart3.hdmarx, DMA_IT_HT);
+  }
+}
+
+static uint32_t uart_test_get_bits(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart) {
+  uint32_t bits = 0;
+
+  if (tx_uart == &huart1) {
+    bits |= UART_TEST_EVT_UART1_TX;
+  } else if (tx_uart == &huart3) {
+    bits |= UART_TEST_EVT_UART3_TX;
+  }
+
+  if (rx_uart == &huart1) {
+    bits |= UART_TEST_EVT_UART1_RX;
+  } else if (rx_uart == &huart3) {
+    bits |= UART_TEST_EVT_UART3_RX;
+  }
+
+  return bits;
+}
+
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
-  uint8_t rx_buf[8] = {0};
+  uint32_t bits = uart_test_get_bits(tx_uart, rx_uart);
+  uint32_t notified = 0;
+  uint8_t *rx_buf = (rx_uart == &huart1) ? uart_test_rx_buf_1 : uart_test_rx_buf_3;
+  volatile uint16_t *rx_len = (rx_uart == &huart1) ? &uart_test_rx_len_1 : &uart_test_rx_len_3;
+
+  xTaskNotifyStateClear(main_task_handle);
+  xTaskNotifyWait(0, UINT32_MAX, &notified, 0);
 
   HAL_UART_Abort(rx_uart);
   HAL_UART_Abort(tx_uart);
 
   uart_test_set_rs485(tx1, tx1 ? 0 : 1);
-  osDelay(10);
+  uart_test_prepare_rx(rx_uart, len);
 
-  if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
+  if (HAL_UART_Transmit_DMA(tx_uart, (uint8_t *)packet, len) != HAL_OK) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
     return;
   }
 
-  osDelay(10);
-
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
+  if (xTaskNotifyWait(0, bits, &notified, pdMS_TO_TICKS(1500)) != pdTRUE || (notified & bits) != bits) {
     *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: timeout прерываний", name);
     return;
   }
 
-  if (memcmp(rx_buf, packet, len) != 0) {
+  if (*rx_len != len || memcmp(rx_buf, packet, len) != 0) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет не совпал", name);
-    return;
   }
 }
 
 static void main_task_thread(void *argument) {
   (void) argument;
-  
-#ifdef DEBUG  
-  uint32_t runtime[3] = {0};
-#endif
-  
+
   Menu_Navigate(&Menu_7);
-  
-  modbus_t telegram_sensor_pressure = {
-    // function code
-    .u8fct = MB_FC_READ_REGISTERS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 1,
-  };
-  
-  modbus_t telegram_umvh = {
-    // function code
-    .u8fct = MB_FC_READ_REGISTERS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 9,
-    // pointer to a memory array
-    .u16reg = mb_reg_umvh,
-    // set the Modbus request parameters
-    .u8id = settings.umvh_id,
-  };
-  
-  modbus_t telegram_urm = {
-    // function code 15
-    .u8fct = MB_FC_WRITE_MULTIPLE_COILS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 16,
-    // pointer to a memory array
-    .u16reg = &mb_reg_urm,
-    // set the Modbus request parameters
-    .u8id = settings.urm_id,    
-  };
-  
-  uint32_t notification;
-  
-  memset(mb_reg_pressure, 0, sizeof(mb_reg_pressure)/sizeof(mb_reg_pressure[0]));
-  
-  uint32_t tick = osKernelGetTickCount();
-  
-  mb_reg_urm = 0;
-  
-  switch_state = 0;
-  
+
   osStatus_t status;
   uart_test_state_t uart_test_state = UART_TEST_IDLE;
   const uint8_t uart_packet_a[6] = {0xA5, 0x5A, 0x01, 0x02, 0x03, 0x04};
   const uint8_t uart_packet_b[6] = {0x3C, 0xC3, 0x10, 0x20, 0x30, 0x40};
-  
+
   control_type_t control_id = CTRL_UNDEFINED;
-  
-#if CHECK_LOAD_SYSTEM == 1  
-  //osEventFlagsWait(load_system_flags, DISPLAY_LOAD_BIT, osFlagsWaitAny|osFlagsNoClear, osWaitForever);
-#endif
-  
-  // close valve1 
-  //bitSet(mb_reg_urm, settings.valve1_io + 7);
-  // open valve2
-  //bitSet(mb_reg_urm, settings.valve2_io + 7);
-  
+
   while (1) {
-#ifdef DEBUG
-    runtime[0] = HAL_GetTick();
-#endif    
-
-    tick += pdMS_TO_TICKS(settings.mb_rate);
-
     status = osMessageQueueGet(control_msg_queue, &control_id, NULL, 2U);
-    if (status == osOK) {
-      switch (control_id) {
-        case CTRL_RESET : {
-          break;
-        }
-        case CTRL_HAND : {
-          break;
-        }
-        case CTRL_STOP : {
-          oled_msg.emer_state = 1;
-          break;
-        }
-        default: {
-          break;
-        }
-      }
+    if (status == osOK && control_id == CTRL_STOP) {
+      oled_msg.emer_state = 1;
     }
 
     if (uart_test_request && uart_test_state != UART_TEST_RUN) {
@@ -837,12 +833,14 @@ static void main_task_thread(void *argument) {
 
       uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
       if (uart_test_ok) {
-        osDelay(50);
+        osDelay(20);
         uart_test_run_once(&huart3, &huart1, 0, uart_packet_b, sizeof(uart_packet_b), "UART3->UART1", (uint8_t *)&uart_test_ok);
       }
+
       uart_test_set_rs485(0, 0);
       HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
+
       if (uart_test_ok) {
         snprintf(uart_test_message, sizeof(uart_test_message), "UART1<->UART3 OK");
       }
@@ -850,400 +848,10 @@ static void main_task_thread(void *argument) {
       uart_test_state = UART_TEST_DONE;
     }
 
-    if (uart_test_state == UART_TEST_RUN) {
-      osDelay(20);
-      continue;
-    }
-
-#ifdef DEBUG
-    WM_Scheduler = uxTaskGetStackHighWaterMark(NULL);
-    zap[0] = HAL_GetTick();
-#endif
-    
-    // read pressure sensor1
-    telegram_sensor_pressure.u8id = settings.sens1_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[MAINLINE];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[1] = HAL_GetTick();
-    zap[2] = zap[1] - zap[0];  
-#endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_ONLINE;
-        
-        oled_msg.pressure_sensor[MAINLINE].value = mb_reg_pressure[MAINLINE] / 100.0f;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-    
-#ifdef DEBUG
-    zap[3] = HAL_GetTick();
-#endif
-    
-    // read pressure sensor2
-    telegram_sensor_pressure.u8id = settings.sens2_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[HYDRAULIC];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[4] = HAL_GetTick();
-    zap[5] = zap[4] - zap[3];
-#endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_NORMAL;
-        
-        oled_msg.pressure_sensor[HYDRAULIC].value = mb_reg_pressure[HYDRAULIC] / 100.0f;
-        
-        // pressure outside the working range?
-        if (mb_reg_pressure[HYDRAULIC] < settings.sens2_min_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_BELOW_NORMAL;
-        } else if (mb_reg_pressure[HYDRAULIC] > settings.sens2_max_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_ABOVE_NORMAL;
-        }
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-
-#ifdef DEBUG
-    zap[6] = HAL_GetTick();
-#endif
-
-/*    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (msg.state_in) {
-        telegram_urm.u8fct = MB_FC_WRITE_MULTIPLE_COILS;
-        telegram_urm.u16CoilsNo = 16;
-      } else {
-        telegram_urm.u8fct = MB_FC_READ_REGISTERS;
-        telegram_urm.u16CoilsNo = 1;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-*/
-
-    notification = modbus_query(&ModbusRS2, &telegram_urm, 2);
-
-#ifdef DEBUG
-    zap[7] = HAL_GetTick();
-    zap[8] = zap[7] - zap[6];
-#endif
-    
-    if (notification != MB_ERR_OK) {
-      oled_msg.valve.state = STATE_OFFLINE;
-      oled_msg.urm_state = STATE_OFFLINE;
-    } else {
-      oled_msg.valve.state = STATE_ONLINE;
-      oled_msg.urm_state = STATE_ONLINE;
-    }
-    
-    //mb_reg_urm = 0;
-    
-#ifdef DEBUG
-    zap[9] = HAL_GetTick();
-#endif
-
-    // read displacement sensor and start signal
-    notification = modbus_query(&ModbusRS2, &telegram_umvh, 2);
-
-#ifdef DEBUG
-    zap[10] = HAL_GetTick();
-    zap[11] = zap[10] - zap[9];
-#endif
-
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      // offline
-      if (notification != MB_ERR_OK) {
-        oled_msg.umvh_state = STATE_OFFLINE;
-        oled_msg.position_state = STATE_OFFLINE;
-      } else {
-        oled_msg.umvh_state = STATE_ONLINE;
-        oled_msg.position_state = STATE_ONLINE;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-    
-    if (osSemaphoreAcquire(valve_controlSemaphore, 2) == osOK) {
-      if (local_valve_control.tick < osKernelGetTickCount() || 
-          local_valve_control.state == VALVE_STOP) 
-      {
-        local_valve_control.state = VALVE_STOP;
-        // close valve1 
-        bitClear(mb_reg_urm, settings.valve1_io - 1);
-        // close valve2
-        bitClear(mb_reg_urm, settings.valve2_io - 1);
-      } else {
-        // decrease coordinate
-        if (local_valve_control.state == VALVE_DOWN) {
-          // close valve1 
-          bitClear(mb_reg_urm, settings.valve1_io - 1);
-          // open valve2
-          bitSet(mb_reg_urm, settings.valve2_io - 1);
-        }
-        // increase coordinate
-        if (local_valve_control.state == VALVE_UP) { 
-          // open valve1 
-          bitSet(mb_reg_urm, settings.valve1_io - 1);
-          // close valve2
-          bitClear(mb_reg_urm, settings.valve2_io - 1);
-        }
-      }
-      oled_msg.valve.value_out = mb_reg_urm;
-      osSemaphoreRelease(valve_controlSemaphore);
-    }
-    
-/*
-    if (((mb_reg_umvh[settings.sens3_io] >> 12) & 0xF) == VOLTAGE_IN && oled_msg.umvh_state == STATE_ONLINE) {
-      float coef_a = (global_tuning.max_stroke - global_tuning.min_stroke) / ((global_tuning.adc_max_stroke - global_tuning.adc_min_stroke) / 100.f);
-      float coef_b = global_tuning.adc_min_stroke / 100.0f * coef_a;
-      
-      if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-        // convert volts -> mm and add zero offset
-        oled_msg.position = (uint16_t)(coef_a * (mb_reg_umvh[settings.sens3_io] & 0xFFF) / 100.0f - coef_b + global_tuning.zero_offset);
-        
-        if (oled_msg.position > 9999) {
-          oled_msg.position = 9999;
-        }
-        
-        oled_msg.position_state = STATE_NORMAL;
-        
-        // position outside the working range?
-        if (oled_msg.position < settings.sens3_min_val || oled_msg.position > settings.sens3_max_val) {
-          // warning
-          oled_msg.position_state = STATE_BELOW_NORMAL;
-          // error position near extreme values
-          if (oled_msg.position <= settings.sens3_min_lim ) {
-            oled_msg.position_state = STATE_MIN_LIM;
-          } else if (oled_msg.position >= settings.sens3_max_lim) {
-            oled_msg.position_state = STATE_MAX_LIM;
-          }
-        }
-        osSemaphoreRelease(msgSemaphore);
-      }
-    } else {
-      if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-        // error - input type mismatch
-        oled_msg.position_state = STATE_UNDEFINED;
-        osSemaphoreRelease(msgSemaphore);
-      }
-    }
-*/
-    
-/*    
-    debounce_logic.count = (global_tuning.debounce_in / settings.mb_rate) << 1;
-    
-    if (debounce_logic.count > 63) {
-      debounce_logic.count = 63;
-    }
-*/
-    
-/*
-    if (((mb_reg_umvh[settings.state_in_io] >> 12) & 0xF) == LOGICAL_IN && oled_msg.umvh_state == STATE_ONLINE) {
-      debounce_logic.state_umvh = mb_reg_umvh[settings.state_in_io] & 0x3;
-      if (debounce_logic.state_umvh == SHORT_CIRCUIT) {
-        bit_map |= (1 << index_map);
-      } else {
-        bit_map &= ~(1 << index_map);
-      }        
-      index_map = (index_map == debounce_logic.count) ? 0 : index_map + 1;
-    } else {
-      debounce_logic.state_umvh = NCONNECTED;
-    }
-*/
-    
-/*    
-    debounce_logic.state_statistics = count_bits_set_parallel(bit_map);
-    
-    debounce_logic.threshold_change = debounce_logic.count >> 1;
-
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      
-      if ((debounce_logic.state_statistics > debounce_logic.threshold_change) && 
-          (debounce_logic.state_umvh != NCONNECTED)) 
-      {
-        oled_msg.state_in = DI_RUN;
-      } else if (debounce_logic.state_umvh == NCONNECTED) {
-        oled_msg.state_in = DI_UNDEFINED;
-        switch_state = 0;
-        switch_map = 0;
-      } else {
-        oled_msg.state_in = DI_NRUN;
-        switch_state = 0;
-        switch_map = 0;
-      }
-
-      osSemaphoreRelease(msgSemaphore);
-    }
-*/
-    
-/*
-    if (oled_msg.system_control_mode == AUTO_SYS_CONTROL && 
-        (oled_msg.position_state == STATE_NORMAL || oled_msg.position_state == STATE_BELOW_NORMAL)) 
-    {
-      if (oled_msg.state_in == DI_RUN) {
-        if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-          if (test_sensor.state == SELFTEST_NRUN) {
-            test_sensor.state = SELFTEST_RUN;
-            test_sensor.tick = 0;
-          } 
-          if (test_sensor.state == SELFTEST_RUN) {
-            //
-            if (test_sensor.tick == 0) {
-              test_sensor.start_position = oled_msg.position;
-              if ((oled_msg.position - global_tuning.min_stroke_rod) > settings.sens3_min_val) {
-                test_sensor.dir = STROKE_DOWN;
-              } else {
-                test_sensor.dir = STROKE_UP;
-              }
-            }
-
-            stroke(test_sensor.dir);
-
-            if (abs(oled_msg.position - test_sensor.start_position) > global_tuning.min_stroke_rod) {
-              test_sensor.state = SELFTEST_OK;
-            }
-            if ((test_sensor.state != SELFTEST_OK) && 
-                (test_sensor.tick > global_tuning.self_test_duration * 10)) 
-            {
-              test_sensor.state = SELFTEST_NOK;
-              stroke(STROKE_STOP);
-            }
-            test_sensor.tick++;            
-          }
-          osSemaphoreRelease(msgSemaphore);
-        }
-      } else {
-        test_sensor.state = SELFTEST_NRUN;
-      }
-
-      if (oled_msg.pressure1_state == STATE_ONLINE && 
-          oled_msg.pressure2_state == STATE_NORMAL &&
-          test_sensor.state == SELFTEST_OK && 
-          oled_msg.state_in == DI_RUN && switch_state &&
-         (oled_msg.position_state == STATE_NORMAL || oled_msg.position_state == STATE_BELOW_NORMAL))
-      {
-        oled_msg.state_out = DO_RUN;
-        bitSet(mb_reg_urm, settings.state_out_io - 1);
-      } else {
-        oled_msg.state_out = DO_NRUN;
-        bitClear(mb_reg_urm, settings.state_out_io - 1);
-      }
-      
-      if (oled_msg.state_in == DI_RUN && test_sensor.state == SELFTEST_OK) {
-        float error = global_tuning.hysteresis_window;      
-        float delta = mb_reg_pressure[HYDRAULIC] - settings.pressure_set_point;
-
-        if (delta > error) {
-          stroke(STROKE_UP);
-          switch_map = 0;
-          osTimerStop(timer_delayed_start);
-        } else if (delta < -error) {
-          stroke(STROKE_DOWN);
-          switch_map = 0;
-          osTimerStop(timer_delayed_start);
-        } else {
-          stroke(STROKE_STOP);
-          if (switch_map < 64) {
-            switch_map++;
-          }
-        }
-        if (switch_map == 64) {
-          if (!switch_state && !osTimerIsRunning(timer_delayed_start)) {
-            osTimerStart(timer_delayed_start, global_tuning.delay_out);
-          }          
-        }
-      }
-    } else { // LOCAL_SYS_CONTROL
-      oled_msg.state_out = DO_NRUN;
-      bitClear(mb_reg_urm, settings.state_out_io - 1);
-
-      if (osSemaphoreAcquire(valve_controlSemaphore, 2) == osOK) {
-        if (local_valve_control == 0) {
-          control_count = 5;
-        } else {
-          if (control_count > 0) {
-            control_count--;
-          } else {
-            local_valve_control = 0;
-          }
-          
-          if ((oled_msg.position_state == STATE_MIN_LIM && local_valve_control == STROKE_UP) || 
-              (oled_msg.position_state == STATE_MAX_LIM && local_valve_control == STROKE_DOWN) || 
-              (oled_msg.position_state != STATE_MIN_LIM && oled_msg.position_state != STATE_MAX_LIM)) 
-          {
-            stroke(local_valve_control);
-          }
-        }
-        osSemaphoreRelease(valve_controlSemaphore);
-      }
-    }
-*/
-    
-    if (osSemaphoreAcquire(ModbusTCPs.ModBusSphrHandle, 2) == osOK) {
-      ModbusTCPs.u16regs[0] = VERSION_MAJOR;
-      ModbusTCPs.u16regs[1] = VERSION_MINOR;
-      ModbusTCPs.u16regs[2] = VERSION_BUILD;
-      
-      ModbusTCPs.u16regs[3] = identification.serial_number;
-      
-      ModbusTCPs.u16regs[4] = settings.mb_rate;
-      ModbusTCPs.u16regs[5] = settings.mb_timeout;
-      
-      ModbusTCPs.u16regs[6] = oled_msg.urm_state;
-      ModbusTCPs.u16regs[7] = oled_msg.umvh_state;
-      
-      ModbusTCPs.u16regs[8] = oled_msg.pressure_sensor[MAINLINE].state;
-      ModbusTCPs.u16regs[9] = oled_msg.pressure_sensor[HYDRAULIC].state;
-      ModbusTCPs.u16regs[10] = oled_msg.position_state;
-      
-      ModbusTCPs.u16regs[11] = mb_reg_pressure[MAINLINE];
-      ModbusTCPs.u16regs[12] = mb_reg_pressure[HYDRAULIC];
-      
-      ModbusTCPs.u16regs[13] = settings.pressure_set_point;      
-      ModbusTCPs.u16regs[14] = oled_msg.position;      
-      ModbusTCPs.u16regs[15] = oled_msg.state_in;
-      ModbusTCPs.u16regs[16] = oled_msg.state_out;
-      
-      ModbusTCPs.u16regs[17] = settings.sens2_min_val;
-      ModbusTCPs.u16regs[18] = settings.sens2_max_val;
-      
-      ModbusTCPs.u16regs[19] = settings.sens3_min_val;
-      ModbusTCPs.u16regs[20] = settings.sens3_max_val;
-      
-      osSemaphoreRelease(ModbusTCPs.ModBusSphrHandle);
-    }
-
-#ifdef DEBUG    
-    runtime[1] = HAL_GetTick();
-    runtime[2] = runtime[1] - runtime[0];
-#endif
-    
-#if CHECK_LOAD_SYSTEM == 1
-    osEventFlagsSet(load_system_flags, MAIN_LOAD_BIT);
-#endif
-
-    osDelayUntil(tick);
+    osDelay(20);
   }
 }
 
-/*
-void delayed_start_callback(void *argument) {
-  (void) argument;  
-  switch_state = 1;
-}
-*/
 static void ring_line_thread(void *argument) {
   (void) argument;
 

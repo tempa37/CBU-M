@@ -4,6 +4,8 @@
 #include "main.h"
 #include "Modbus.h"
 
+uint32_t uart_test_notify_from_isr(UART_HandleTypeDef *huart, uint8_t tx_done, uint16_t rx_size);
+
 /**
 * @brief
 * This is the callback for HAL interrupts of UART TX used by Modbus library.
@@ -22,6 +24,9 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
       xTaskNotifyFromISR(mHandlers[i]->myTaskModbusAHandle, 0, eNoAction, &xHigherPriorityTaskWoken);
       break;
     }
+  }
+  if (uart_test_notify_from_isr(huart, 1, 0)) {
+    xHigherPriorityTaskWoken = pdTRUE;
   }
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU TX callback END
@@ -50,6 +55,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
       }
       break;
     }
+  }
+  if (uart_test_notify_from_isr(UartHandle, 0, 1)) {
+    xHigherPriorityTaskWoken = pdTRUE;
   }
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU RX callback END
@@ -96,6 +104,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
             // we don't need half-transfer interrupt
             __HAL_DMA_DISABLE_IT(mHandlers[i]->port->hdmarx, DMA_IT_HT);
             xTaskNotifyFromISR(mHandlers[i]->myTaskModbusAHandle, 0 , eSetValueWithOverwrite, &xHigherPriorityTaskWoken);
+            if (uart_test_notify_from_isr(huart, 0, Size)) {
+              xHigherPriorityTaskWoken = pdTRUE;
+            }
           }
         }
         break;
