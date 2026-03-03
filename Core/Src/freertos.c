@@ -243,9 +243,10 @@ static void wdi_thread(void *argument);
 static void main_task_thread(void *argument);
 static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
-static void modbus_rtu_start(void);
+void modbus_rtu_start(void);
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3);
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok);
+static uint8_t uart_test_wait_flag(volatile uint8_t *flag, uint32_t timeout_ms);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -330,8 +331,7 @@ void MX_FREERTOS_Init(void) {
   httpd_task_handle = osThreadNew(http_server_thread, NULL, &httpd_task_handle_attr);
  
   modbus_tcp_start();
-  //
-  modbus_rtu_start();
+  // Modbus RTU intentionally disabled: UART is used by the web-triggered self test.
 
   main_task_handle = osThreadNew(main_task_thread, NULL, &main_task_handle_attr);
   ring_line_task_handle = osThreadNew(ring_line_thread, NULL, &ring_line_task_handle_attr);
@@ -407,7 +407,7 @@ static void modbus_tcp_start(void) {
  * @brief Modbus RTU Master and Slave
  * @retval None
  */
-static void modbus_rtu_start(void) {
+void modbus_rtu_start(void) {
   //osEventFlagsWait(evt_id, 16, osFlagsWaitAny|osFlagsNoClear, osWaitForever);
   
   // Modbus RTU master - internal connection
@@ -698,24 +698,63 @@ static void uart_test_reinit(void) {
   MX_USART3_UART_Init();
 }
 
+static volatile uint8_t uart1_tx_done = 0;
+static volatile uint8_t uart1_rx_done = 0;
+static volatile uint8_t uart1_error = 0;
+static volatile uint8_t uart3_tx_done = 0;
+static volatile uint8_t uart3_rx_done = 0;
+static volatile uint8_t uart3_error = 0;
+
+static uint8_t uart_test_wait_flag(volatile uint8_t *flag, uint32_t timeout_ms) {
+  uint32_t start = HAL_GetTick();
+  while (*flag == 0U) {
+    if ((HAL_GetTick() - start) >= timeout_ms) {
+      return 0;
+    }
+    osDelay(1);
+  }
+  return 1;
+}
+
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
   uint8_t rx_buf[8] = {0};
+  volatile uint8_t *tx_done = (tx_uart == &huart1) ? &uart1_tx_done : &uart3_tx_done;
+  volatile uint8_t *rx_done = (rx_uart == &huart1) ? &uart1_rx_done : &uart3_rx_done;
+  volatile uint8_t *tx_err = (tx_uart == &huart1) ? &uart1_error : &uart3_error;
+  volatile uint8_t *rx_err = (rx_uart == &huart1) ? &uart1_error : &uart3_error;
 
   HAL_UART_Abort(rx_uart);
   HAL_UART_Abort(tx_uart);
 
-  uart_test_set_rs485(tx1, tx1 ? 0 : 1);
-  osDelay(10);
+  *tx_done = 0;
+  *rx_done = 0;
+  *tx_err = 0;
+  *rx_err = 0;
 
-  if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
+  uart_test_set_rs485(tx1, tx1 ? 0 : 1);
+  osDelay(2);
+
+  if (HAL_UART_Receive_DMA(rx_uart, rx_buf, len) != HAL_OK) {
     *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка запуска приема", name);
+    return;
+  }
+
+  if (HAL_UART_Transmit_DMA(tx_uart, (uint8_t *)packet, len) != HAL_OK) {
+    *ok = 0;
+    HAL_UART_AbortReceive(rx_uart);
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка запуска передачи", name);
+    return;
+  }
+
+  if (!uart_test_wait_flag(tx_done, 200) || (*tx_err != 0U)) {
+    *ok = 0;
+    HAL_UART_AbortReceive(rx_uart);
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
     return;
   }
 
-  osDelay(10);
-
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
+  if (!uart_test_wait_flag(rx_done, 200) || (*rx_err != 0U)) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
     return;
@@ -737,55 +776,11 @@ static void main_task_thread(void *argument) {
   
   Menu_Navigate(&Menu_7);
   
-  modbus_t telegram_sensor_pressure = {
-    // function code
-    .u8fct = MB_FC_READ_REGISTERS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 1,
-  };
-  
-  modbus_t telegram_umvh = {
-    // function code
-    .u8fct = MB_FC_READ_REGISTERS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 9,
-    // pointer to a memory array
-    .u16reg = mb_reg_umvh,
-    // set the Modbus request parameters
-    .u8id = settings.umvh_id,
-  };
-  
-  modbus_t telegram_urm = {
-    // function code 15
-    .u8fct = MB_FC_WRITE_MULTIPLE_COILS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 16,
-    // pointer to a memory array
-    .u16reg = &mb_reg_urm,
-    // set the Modbus request parameters
-    .u8id = settings.urm_id,    
-  };
-  
-  uint32_t notification;
-  
-  memset(mb_reg_pressure, 0, sizeof(mb_reg_pressure)/sizeof(mb_reg_pressure[0]));
-  
-  uint32_t tick = osKernelGetTickCount();
-  
-  mb_reg_urm = 0;
-  
-  switch_state = 0;
-  
   osStatus_t status;
   uart_test_state_t uart_test_state = UART_TEST_IDLE;
   const uint8_t uart_packet_a[6] = {0xA5, 0x5A, 0x01, 0x02, 0x03, 0x04};
   const uint8_t uart_packet_b[6] = {0x3C, 0xC3, 0x10, 0x20, 0x30, 0x40};
+  uint32_t tick = osKernelGetTickCount();
   
   control_type_t control_id = CTRL_UNDEFINED;
   
@@ -803,7 +798,7 @@ static void main_task_thread(void *argument) {
     runtime[0] = HAL_GetTick();
 #endif    
 
-    tick += pdMS_TO_TICKS(settings.mb_rate);
+    tick += pdMS_TO_TICKS(20);
 
     status = osMessageQueueGet(control_msg_queue, &control_id, NULL, 2U);
     if (status == osOK) {
@@ -837,7 +832,7 @@ static void main_task_thread(void *argument) {
 
       uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
       if (uart_test_ok) {
-        osDelay(50);
+        osDelay(20);
         uart_test_run_once(&huart3, &huart1, 0, uart_packet_b, sizeof(uart_packet_b), "UART3->UART1", (uint8_t *)&uart_test_ok);
       }
       uart_test_set_rs485(0, 0);
@@ -849,161 +844,6 @@ static void main_task_thread(void *argument) {
       uart_test_ready = 1;
       uart_test_state = UART_TEST_DONE;
     }
-
-    if (uart_test_state == UART_TEST_RUN) {
-      osDelay(20);
-      continue;
-    }
-
-#ifdef DEBUG
-    WM_Scheduler = uxTaskGetStackHighWaterMark(NULL);
-    zap[0] = HAL_GetTick();
-#endif
-    
-    // read pressure sensor1
-    telegram_sensor_pressure.u8id = settings.sens1_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[MAINLINE];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[1] = HAL_GetTick();
-    zap[2] = zap[1] - zap[0];  
-#endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_ONLINE;
-        
-        oled_msg.pressure_sensor[MAINLINE].value = mb_reg_pressure[MAINLINE] / 100.0f;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-    
-#ifdef DEBUG
-    zap[3] = HAL_GetTick();
-#endif
-    
-    // read pressure sensor2
-    telegram_sensor_pressure.u8id = settings.sens2_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[HYDRAULIC];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[4] = HAL_GetTick();
-    zap[5] = zap[4] - zap[3];
-#endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_NORMAL;
-        
-        oled_msg.pressure_sensor[HYDRAULIC].value = mb_reg_pressure[HYDRAULIC] / 100.0f;
-        
-        // pressure outside the working range?
-        if (mb_reg_pressure[HYDRAULIC] < settings.sens2_min_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_BELOW_NORMAL;
-        } else if (mb_reg_pressure[HYDRAULIC] > settings.sens2_max_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_ABOVE_NORMAL;
-        }
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-
-#ifdef DEBUG
-    zap[6] = HAL_GetTick();
-#endif
-
-/*    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (msg.state_in) {
-        telegram_urm.u8fct = MB_FC_WRITE_MULTIPLE_COILS;
-        telegram_urm.u16CoilsNo = 16;
-      } else {
-        telegram_urm.u8fct = MB_FC_READ_REGISTERS;
-        telegram_urm.u16CoilsNo = 1;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-*/
-
-    notification = modbus_query(&ModbusRS2, &telegram_urm, 2);
-
-#ifdef DEBUG
-    zap[7] = HAL_GetTick();
-    zap[8] = zap[7] - zap[6];
-#endif
-    
-    if (notification != MB_ERR_OK) {
-      oled_msg.valve.state = STATE_OFFLINE;
-      oled_msg.urm_state = STATE_OFFLINE;
-    } else {
-      oled_msg.valve.state = STATE_ONLINE;
-      oled_msg.urm_state = STATE_ONLINE;
-    }
-    
-    //mb_reg_urm = 0;
-    
-#ifdef DEBUG
-    zap[9] = HAL_GetTick();
-#endif
-
-    // read displacement sensor and start signal
-    notification = modbus_query(&ModbusRS2, &telegram_umvh, 2);
-
-#ifdef DEBUG
-    zap[10] = HAL_GetTick();
-    zap[11] = zap[10] - zap[9];
-#endif
-
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      // offline
-      if (notification != MB_ERR_OK) {
-        oled_msg.umvh_state = STATE_OFFLINE;
-        oled_msg.position_state = STATE_OFFLINE;
-      } else {
-        oled_msg.umvh_state = STATE_ONLINE;
-        oled_msg.position_state = STATE_ONLINE;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-    
-    if (osSemaphoreAcquire(valve_controlSemaphore, 2) == osOK) {
-      if (local_valve_control.tick < osKernelGetTickCount() || 
-          local_valve_control.state == VALVE_STOP) 
-      {
-        local_valve_control.state = VALVE_STOP;
-        // close valve1 
-        bitClear(mb_reg_urm, settings.valve1_io - 1);
-        // close valve2
-        bitClear(mb_reg_urm, settings.valve2_io - 1);
-      } else {
-        // decrease coordinate
-        if (local_valve_control.state == VALVE_DOWN) {
-          // close valve1 
-          bitClear(mb_reg_urm, settings.valve1_io - 1);
-          // open valve2
-          bitSet(mb_reg_urm, settings.valve2_io - 1);
-        }
-        // increase coordinate
-        if (local_valve_control.state == VALVE_UP) { 
-          // open valve1 
-          bitSet(mb_reg_urm, settings.valve1_io - 1);
-          // close valve2
-          bitClear(mb_reg_urm, settings.valve2_io - 1);
-        }
-      }
-      oled_msg.valve.value_out = mb_reg_urm;
-      osSemaphoreRelease(valve_controlSemaphore);
-    }
-    
 /*
     if (((mb_reg_umvh[settings.sens3_io] >> 12) & 0xF) == VOLTAGE_IN && oled_msg.umvh_state == STATE_ONLINE) {
       float coef_a = (global_tuning.max_stroke - global_tuning.min_stroke) / ((global_tuning.adc_max_stroke - global_tuning.adc_min_stroke) / 100.f);
@@ -1235,6 +1075,30 @@ static void main_task_thread(void *argument) {
 #endif
 
     osDelayUntil(tick);
+  }
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+  if (huart == &huart1) {
+    uart1_tx_done = 1;
+  } else if (huart == &huart3) {
+    uart3_tx_done = 1;
+  }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  if (huart == &huart1) {
+    uart1_rx_done = 1;
+  } else if (huart == &huart3) {
+    uart3_rx_done = 1;
+  }
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+  if (huart == &huart1) {
+    uart1_error = 1;
+  } else if (huart == &huart3) {
+    uart3_error = 1;
   }
 }
 

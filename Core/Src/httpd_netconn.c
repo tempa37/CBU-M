@@ -821,8 +821,12 @@ static void http_server(struct netconn *conn) {
           } else if (ret == STATUS_INPROGRESS) {
             
             //osThreadSuspend(ModbusTCPm.myTaskModbusAHandle);
-            osThreadSuspend(ModbusRS2.myTaskModbusAHandle);
-            osThreadSuspend(ModbusRS1.myTaskModbusAHandle);
+            if (ModbusRS2.myTaskModbusAHandle != NULL) {
+              osThreadSuspend(ModbusRS2.myTaskModbusAHandle);
+            }
+            if (ModbusRS1.myTaskModbusAHandle != NULL) {
+              osThreadSuspend(ModbusRS1.myTaskModbusAHandle);
+            }
             
             // Don't close the connection!
 
