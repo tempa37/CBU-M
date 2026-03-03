@@ -245,7 +245,7 @@ static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3);
-static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok);
+static void uart_test_run_once(modbusHandler_t *master, modbusHandler_t *slave, uint8_t slave_id, const char *name, uint8_t *ok);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -698,30 +698,47 @@ static void uart_test_reinit(void) {
   MX_USART3_UART_Init();
 }
 
-static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
-  uint8_t rx_buf[8] = {0};
+static void uart_test_run_once(modbusHandler_t *master, modbusHandler_t *slave, uint8_t slave_id, const char *name, uint8_t *ok) {
+  modbus_t telegram = {
+    .u8id = slave_id,
+    .u8fct = MB_FC_READ_REGISTERS,
+    .u16RegAdd = 0,
+    .u16CoilsNo = 1,
+  };
+  uint16_t read_value = 0;
+  uint32_t result;
 
-  HAL_UART_Abort(rx_uart);
-  HAL_UART_Abort(tx_uart);
+  telegram.u16reg = &read_value;
 
-  uart_test_set_rs485(tx1, tx1 ? 0 : 1);
-  osDelay(10);
+  uart_test_set_rs485(0, 0);
+  HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_SET);
 
-  if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
+  if (osSemaphoreAcquire(slave->ModBusSphrHandle, 200) != osOK) {
     *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет доступа к slave", name);
+    return;
+  }
+  slave->u8id = slave_id;
+  slave->u16regs[0] = 0x55AA;
+  osSemaphoreRelease(slave->ModBusSphrHandle);
+
+  if (osSemaphoreAcquire(master->ModBusSphrHandle, 200) != osOK) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет доступа к master", name);
+    return;
+  }
+  set_timeout(master, 300, 300);
+  osSemaphoreRelease(master->ModBusSphrHandle);
+
+  result = modbus_query(master, &telegram, 1);
+  if (result != MB_ERR_OK) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: modbus query error %lu", name, result);
     return;
   }
 
-  osDelay(10);
-
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
-    *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
-    return;
-  }
-
-  if (memcmp(rx_buf, packet, len) != 0) {
+  if (read_value != 0x55AA) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет не совпал", name);
     return;
@@ -784,8 +801,7 @@ static void main_task_thread(void *argument) {
   
   osStatus_t status;
   uart_test_state_t uart_test_state = UART_TEST_IDLE;
-  const uint8_t uart_packet_a[6] = {0xA5, 0x5A, 0x01, 0x02, 0x03, 0x04};
-  const uint8_t uart_packet_b[6] = {0x3C, 0xC3, 0x10, 0x20, 0x30, 0x40};
+  const uint8_t modbus_app_logic_enabled = 0;
   
   control_type_t control_id = CTRL_UNDEFINED;
   
@@ -835,11 +851,7 @@ static void main_task_thread(void *argument) {
     if (uart_test_state == UART_TEST_RUN) {
       uart_test_reinit();
 
-      uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
-      if (uart_test_ok) {
-        osDelay(50);
-        uart_test_run_once(&huart3, &huart1, 0, uart_packet_b, sizeof(uart_packet_b), "UART3->UART1", (uint8_t *)&uart_test_ok);
-      }
+      uart_test_run_once(&ModbusRS2, &ModbusRS1, settings.self_id, "UART(ModbusRTU)", (uint8_t *)&uart_test_ok);
       uart_test_set_rs485(0, 0);
       HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
@@ -852,6 +864,11 @@ static void main_task_thread(void *argument) {
 
     if (uart_test_state == UART_TEST_RUN) {
       osDelay(20);
+      continue;
+    }
+
+    if (!modbus_app_logic_enabled) {
+      osDelayUntil(tick);
       continue;
     }
 
