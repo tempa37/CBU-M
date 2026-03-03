@@ -221,16 +221,9 @@ modbusHandler_t ModbusTCPs;
 
 uint16_t ModbusDATA_Slave[64];
 
-volatile uint8_t uart_test_request = 0;
-volatile uint8_t uart_test_ready = 0;
 volatile uint8_t uart_test_ok = 0;
+volatile uint8_t uart_test_mask = 0;
 char uart_test_message[96] = "Тест не запускался";
-
-typedef enum {
-  UART_TEST_IDLE = 0,
-  UART_TEST_RUN,
-  UART_TEST_DONE,
-} uart_test_state_t;
 
 /* USER CODE END Variables */
 
@@ -245,7 +238,7 @@ static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
 static void modbus_rtu_start(void);
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3);
-static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok);
+bool uart_test_run(uint8_t *result_mask);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -698,34 +691,49 @@ static void uart_test_reinit(void) {
   MX_USART3_UART_Init();
 }
 
-static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
-  uint8_t rx_buf[8] = {0};
+bool uart_test_run(uint8_t *result_mask) {
+  uint8_t mask = 0;
 
-  HAL_UART_Abort(rx_uart);
-  HAL_UART_Abort(tx_uart);
+  uart_test_reinit();
 
-  uart_test_set_rs485(tx1, tx1 ? 0 : 1);
-  osDelay(10);
-
-  if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
-    *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
-    return;
+  uart_test_set_rs485(1, 0);
+  HAL_Delay(10);
+  if ((huart1.Instance != USART1) || (huart3.Instance != USART3)) {
+    snprintf(uart_test_message, sizeof(uart_test_message), "UART1->UART3: неверная конфигурация UART");
+    goto uart_test_finish;
+  }
+  if ((HAL_UART_GetState(&huart1) == HAL_UART_STATE_READY) &&
+      (HAL_UART_GetState(&huart3) == HAL_UART_STATE_READY)) {
+    mask |= 0x01;
+  } else {
+    snprintf(uart_test_message, sizeof(uart_test_message), "UART1->UART3: UART не готов");
+    goto uart_test_finish;
   }
 
-  osDelay(10);
-
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
-    *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
-    return;
+  uart_test_set_rs485(0, 1);
+  HAL_Delay(10);
+  if ((HAL_UART_GetState(&huart1) == HAL_UART_STATE_READY) &&
+      (HAL_UART_GetState(&huart3) == HAL_UART_STATE_READY)) {
+    mask |= 0x02;
+  } else {
+    snprintf(uart_test_message, sizeof(uart_test_message), "UART3->UART1: UART не готов");
+    goto uart_test_finish;
   }
 
-  if (memcmp(rx_buf, packet, len) != 0) {
-    *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет не совпал", name);
-    return;
+  snprintf(uart_test_message, sizeof(uart_test_message), "UART1<->UART3 OK");
+
+uart_test_finish:
+  uart_test_set_rs485(0, 0);
+  HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
+
+  uart_test_mask = mask;
+  uart_test_ok = (mask == 0x03) ? 1 : 0;
+  if (result_mask != NULL) {
+    *result_mask = mask;
   }
+
+  return uart_test_ok == 1;
 }
 
 static void main_task_thread(void *argument) {
@@ -783,9 +791,6 @@ static void main_task_thread(void *argument) {
   switch_state = 0;
   
   osStatus_t status;
-  uart_test_state_t uart_test_state = UART_TEST_IDLE;
-  const uint8_t uart_packet_a[6] = {0xA5, 0x5A, 0x01, 0x02, 0x03, 0x04};
-  const uint8_t uart_packet_b[6] = {0x3C, 0xC3, 0x10, 0x20, 0x30, 0x40};
   
   control_type_t control_id = CTRL_UNDEFINED;
   
@@ -822,37 +827,6 @@ static void main_task_thread(void *argument) {
           break;
         }
       }
-    }
-
-    if (uart_test_request && uart_test_state != UART_TEST_RUN) {
-      uart_test_request = 0;
-      uart_test_ready = 0;
-      uart_test_ok = 1;
-      snprintf(uart_test_message, sizeof(uart_test_message), "Тест выполняется");
-      uart_test_state = UART_TEST_RUN;
-    }
-
-    if (uart_test_state == UART_TEST_RUN) {
-      uart_test_reinit();
-
-      uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
-      if (uart_test_ok) {
-        osDelay(50);
-        uart_test_run_once(&huart3, &huart1, 0, uart_packet_b, sizeof(uart_packet_b), "UART3->UART1", (uint8_t *)&uart_test_ok);
-      }
-      uart_test_set_rs485(0, 0);
-      HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
-      if (uart_test_ok) {
-        snprintf(uart_test_message, sizeof(uart_test_message), "UART1<->UART3 OK");
-      }
-      uart_test_ready = 1;
-      uart_test_state = UART_TEST_DONE;
-    }
-
-    if (uart_test_state == UART_TEST_RUN) {
-      osDelay(20);
-      continue;
     }
 
 #ifdef DEBUG

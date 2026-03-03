@@ -187,10 +187,9 @@ extern osSemaphoreId_t flash_semaphore;
 //extern modbusHandler_t ModbusTCPm;
 extern modbusHandler_t ModbusRS1;
 extern modbusHandler_t ModbusRS2;
-extern volatile uint8_t uart_test_request;
-extern volatile uint8_t uart_test_ready;
 extern volatile uint8_t uart_test_ok;
 extern char uart_test_message[96];
+extern bool uart_test_run(uint8_t *result_mask);
 
 void send_response(struct netconn *conn) {
   char content_length_header[32] = {0};
@@ -704,21 +703,19 @@ void authorization_process(struct netconn *conn, const char *buf, const char *ur
  *
  */
 
-static void uart_test_start(struct netconn *conn) {
-  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
-    uart_test_request = 1;
-    uart_test_ready = 0;
-    memset(html, 0, HTML_LEN);
-    length_html = sprintf((char *)html, "{\"started\":1}");
-    send_response(conn);
-    osSemaphoreRelease(httpdbufSemaphore);
-  }
-}
-
 static void uart_test_result(struct netconn *conn) {
   if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    uint8_t result_mask = 0;
+
+    uart_test_run(&result_mask);
+
     memset(html, 0, HTML_LEN);
-    length_html = sprintf((char *)html, "{\"ready\":%d,\"ok\":%d,\"message\":\"%s\"}", uart_test_ready, uart_test_ok, uart_test_message);
+    length_html = sprintf((char *)html,
+                          "{\"uart1_to_uart3\":%d,\"uart3_to_uart1\":%d,\"ok\":%d,\"message\":\"%s\"}",
+                          (result_mask & 0x01) ? 1 : 0,
+                          (result_mask & 0x02) ? 1 : 0,
+                          uart_test_ok,
+                          uart_test_message);
     send_response(conn);
     osSemaphoreRelease(httpdbufSemaphore);
   }
@@ -790,10 +787,7 @@ static void http_server(struct netconn *conn) {
           else if (strncmp(buf, "GET /info.json", 14) == 0) {
             status_sys(conn);
           }
-          else if (strncmp(buf, "GET /uart_test_start", 20) == 0) {
-            uart_test_start(conn);
-          }
-          else if (strncmp(buf, "GET /uart_test_result", 21) == 0) {
+          else if (strncmp(buf, "GET /uart_test.json", 19) == 0) {
             uart_test_result(conn);
           }
           else if (strncmp(buf, "GET /info.html", 14) == 0) {
