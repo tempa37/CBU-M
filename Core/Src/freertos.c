@@ -224,6 +224,10 @@ uint16_t ModbusDATA_Slave[64];
 volatile uint8_t uart_test_request = 0;
 volatile uint8_t uart_test_ready = 0;
 volatile uint8_t uart_test_ok = 0;
+volatile uint8_t uart_test_active = 0;
+UART_HandleTypeDef *uart_test_tx_handle = NULL;
+UART_HandleTypeDef *uart_test_rx_handle = NULL;
+osEventFlagsId_t uart_test_event_flags;
 char uart_test_message[96] = "Тест не запускался";
 
 typedef enum {
@@ -231,6 +235,9 @@ typedef enum {
   UART_TEST_RUN,
   UART_TEST_DONE,
 } uart_test_state_t;
+
+#define UART_TEST_EVT_TX (1UL << 0)
+#define UART_TEST_EVT_RX (1UL << 1)
 
 /* USER CODE END Variables */
 
@@ -315,6 +322,7 @@ void MX_FREERTOS_Init(void) {
   keyboard_msg_queue = osMessageQueueNew(1, sizeof(button_t), NULL);
   
   control_msg_queue = osMessageQueueNew(1, sizeof(uint8_t), NULL);
+  uart_test_event_flags = osEventFlagsNew(NULL);
 
   // Create the thread(s)
   
@@ -699,7 +707,8 @@ static void uart_test_reinit(void) {
 }
 
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
-  uint8_t rx_buf[8] = {0};
+  static uint8_t rx_buf[8] = {0};
+  uint32_t flags;
 
   HAL_UART_Abort(rx_uart);
   HAL_UART_Abort(tx_uart);
@@ -707,15 +716,39 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   uart_test_set_rs485(tx1, tx1 ? 0 : 1);
   osDelay(10);
 
-  if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
+  memset(rx_buf, 0, sizeof(rx_buf));
+  uart_test_tx_handle = tx_uart;
+  uart_test_rx_handle = rx_uart;
+  uart_test_active = 1;
+  osEventFlagsClear(uart_test_event_flags, UART_TEST_EVT_TX | UART_TEST_EVT_RX);
+
+  if (HAL_UART_Receive_IT(rx_uart, rx_buf, len) != HAL_OK) {
+    uart_test_active = 0;
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка запуска приема", name);
+    return;
+  }
+
+  if (HAL_UART_Transmit_IT(tx_uart, (uint8_t *)packet, len) != HAL_OK) {
+    uart_test_active = 0;
+    HAL_UART_Abort(rx_uart);
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
     return;
   }
 
-  osDelay(10);
+  flags = osEventFlagsWait(uart_test_event_flags, UART_TEST_EVT_TX, osFlagsWaitAny, 1000);
+  if ((flags & UART_TEST_EVT_TX) == 0) {
+    uart_test_active = 0;
+    HAL_UART_Abort(rx_uart);
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: таймаут передачи", name);
+    return;
+  }
 
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
+  flags = osEventFlagsWait(uart_test_event_flags, UART_TEST_EVT_RX, osFlagsWaitAny, 1000);
+  uart_test_active = 0;
+  if ((flags & UART_TEST_EVT_RX) == 0) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
     return;
