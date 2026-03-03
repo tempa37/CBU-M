@@ -704,7 +704,7 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   HAL_UART_Abort(rx_uart);
   HAL_UART_Abort(tx_uart);
 
-  uart_test_set_rs485(tx1, tx1 ? 0 : 1);
+  uart_test_set_rs485(tx1, tx1 ? 1 : 0);
   osDelay(10);
 
   if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
