@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
+#include <string.h>
 
 UART_HandleTypeDef huart1;
 
@@ -212,4 +213,72 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle) {
     // USART3 interrupt Deinit
     HAL_NVIC_DisableIRQ(USART3_IRQn);
   }
+}
+
+HAL_StatusTypeDef UART_RS485_SetDirection(UART_HandleTypeDef *huart, uint8_t tx_enable) {
+  GPIO_PinState pin_state = tx_enable ? GPIO_PIN_SET : GPIO_PIN_RESET;
+
+  if (huart == &huart1) {
+    HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, pin_state);
+    return HAL_OK;
+  }
+
+  if (huart == &huart3) {
+    HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, pin_state);
+    return HAL_OK;
+  }
+
+  return HAL_ERROR;
+}
+
+HAL_StatusTypeDef UART_SendPacket(UART_HandleTypeDef *huart, const uint8_t *data, uint16_t len, uint32_t timeout) {
+  if (huart == NULL || data == NULL || len == 0U) {
+    return HAL_ERROR;
+  }
+
+  if (UART_RS485_SetDirection(huart, 1U) != HAL_OK) {
+    return HAL_ERROR;
+  }
+
+  return HAL_UART_Transmit(huart, (uint8_t *)data, len, timeout);
+}
+
+HAL_StatusTypeDef UART_ReceivePacket(UART_HandleTypeDef *huart, uint8_t *data, uint16_t len, uint32_t timeout) {
+  if (huart == NULL || data == NULL || len == 0U) {
+    return HAL_ERROR;
+  }
+
+  if (UART_RS485_SetDirection(huart, 0U) != HAL_OK) {
+    return HAL_ERROR;
+  }
+
+  return HAL_UART_Receive(huart, data, len, timeout);
+}
+
+HAL_StatusTypeDef UART_SendReceivePacket(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx_uart1, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len, uint32_t tx_timeout, uint32_t rx_timeout) {
+  if (tx_uart == NULL || rx_uart == NULL || tx_data == NULL || rx_data == NULL || len == 0U) {
+    return HAL_ERROR;
+  }
+
+  HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_SET);
+  HAL_Delay(2);
+
+  if (UART_RS485_SetDirection(&huart1, tx_uart1 ? 1U : 0U) != HAL_OK) {
+    return HAL_ERROR;
+  }
+
+  if (UART_RS485_SetDirection(&huart3, tx_uart1 ? 0U : 1U) != HAL_OK) {
+    return HAL_ERROR;
+  }
+
+  if (HAL_UART_Abort(tx_uart) != HAL_OK || HAL_UART_Abort(rx_uart) != HAL_OK) {
+    return HAL_ERROR;
+  }
+
+  if (HAL_UART_Transmit(tx_uart, (uint8_t *)tx_data, len, tx_timeout) != HAL_OK) {
+    return HAL_ERROR;
+  }
+
+  return HAL_UART_Receive(rx_uart, rx_data, len, rx_timeout);
 }

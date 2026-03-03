@@ -205,13 +205,6 @@ typedef enum {
 } logical_type_t;
 
 
-// internal connection
-modbusHandler_t ModbusRS2;
-uint16_t ModbusDATA_RS2[12];
-
-// modbus RTU slave
-modbusHandler_t ModbusRS1;
-
 // modbus TCP master
 //modbusHandler_t ModbusTCPm;
 //uint16_t ModbusDATA_TCPm[30];
@@ -232,6 +225,14 @@ typedef enum {
   UART_TEST_DONE,
 } uart_test_state_t;
 
+#define UART_TEST_PACKET_LEN 6U
+#define UART_TEST_WAIT_MS 300U
+
+static volatile uint8_t uart_test_rx_done = 0;
+static volatile uint8_t uart_test_rx_error = 0;
+static UART_HandleTypeDef *uart_test_rx_handle = NULL;
+static uint8_t uart_test_rx_buf[UART_TEST_PACKET_LEN] = {0};
+
 /* USER CODE END Variables */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -243,9 +244,8 @@ static void wdi_thread(void *argument);
 static void main_task_thread(void *argument);
 static void ring_line_thread(void *argument);
 static void modbus_tcp_start(void);
-static void modbus_rtu_start(void);
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3);
-static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok);
+static HAL_StatusTypeDef uart_test_run_direction(UART_HandleTypeDef *rx_uart, UART_HandleTypeDef *tx_uart, uint8_t tx1, const uint8_t *tx_packet, uint16_t len, const char *name);
 //void delayed_start_callback(void *argument);
 
 // Function Prototypes
@@ -330,8 +330,6 @@ void MX_FREERTOS_Init(void) {
   httpd_task_handle = osThreadNew(http_server_thread, NULL, &httpd_task_handle_attr);
  
   modbus_tcp_start();
-  //
-  modbus_rtu_start();
 
   main_task_handle = osThreadNew(main_task_thread, NULL, &main_task_handle_attr);
   ring_line_task_handle = osThreadNew(ring_line_thread, NULL, &ring_line_task_handle_attr);
@@ -401,59 +399,6 @@ static void modbus_tcp_start(void) {
   ModbusInit(&ModbusTCPs);
   // Start capturing traffic on serial Port and initialize counters
   ModbusStart(&ModbusTCPs);
-}
-
-/**
- * @brief Modbus RTU Master and Slave
- * @retval None
- */
-static void modbus_rtu_start(void) {
-  //osEventFlagsWait(evt_id, 16, osFlagsWaitAny|osFlagsNoClear, osWaitForever);
-  
-  // Modbus RTU master - internal connection
-  ModbusRS2.uModbusType = MB_MASTER;
-  ModbusRS2.port = &huart1;
-  // RS485 Enable port
-  ModbusRS2.EN_Port = GPIOA;
-  // RS485 Enable pin
-  ModbusRS2.EN_Pin = GPIO_PIN_11;
-  // For master it must be 0
-  ModbusRS2.u8id = 0;
-  
-  //ModbusRS2.u16timeOut = settings.mb_timeout;
-  ModbusRS2.sendtimeout = settings.mb_timeout;
-  ModbusRS2.recvtimeout = settings.mb_timeout;
-  
-  ModbusRS2.u16regs = ModbusDATA_RS2;
-  ModbusRS2.u16regsize = sizeof(ModbusDATA_RS2)/sizeof(ModbusDATA_RS2[0]);
-  ModbusRS2.xTypeHW = USART_HW_DMA;
-  // Initialize Modbus library
-  ModbusInit(&ModbusRS2);
-  // Start capturing traffic on serial Port
-  ModbusStart(&ModbusRS2);
-  
-  // Modbus RTU slave - external connection
-  ModbusRS1.uModbusType = MB_SLAVE;
-  ModbusRS1.port = &huart3;
-  // RS485 Enable port
-  ModbusRS1.EN_Port = GPIOC;
-  // RS485 Enable pin
-  ModbusRS1.EN_Pin = GPIO_PIN_12;
-  ModbusRS1.u8id = settings.self_id;
-  
-  //ModbusRS1.u16timeOut = 1000;
-  ModbusRS1.sendtimeout = 1000;
-  ModbusRS1.recvtimeout = 1000;
-  
-  ModbusRS1.u16regs = ModbusDATA_Slave;
-  ModbusRS1.u16regsize= sizeof(ModbusDATA_Slave)/sizeof(ModbusDATA_Slave[0]);
-  ModbusRS1.xTypeHW = USART_HW_DMA;
-  // Initialize Modbus library
-  ModbusInit(&ModbusRS1);
-  // Start capturing traffic on serial Port
-  ModbusStart(&ModbusRS1);
-
-  //osEventFlagsSet(evt_id, 1);
 }
 
 /**
@@ -657,14 +602,6 @@ typedef struct {
 selftest_t test_sensor = {0};
 */
 
-void modbus_set_timeout(modbusHandler_t *mb) {
-  if (osSemaphoreAcquire(mb->ModBusSphrHandle, 100) == osOK) {
-    //setTimeOut(mb, settings.mb_timeout);
-    set_timeout(mb, settings.mb_timeout, settings.mb_timeout);
-    osSemaphoreRelease(mb->ModBusSphrHandle);
-  }
-}
-
 uint16_t count_bits_set_parallel(uint64_t x) {
   // put count of each 2 bits into those 2 bits
   x -= (x >> 1) & 0x5555555555555555UL;
@@ -698,34 +635,76 @@ static void uart_test_reinit(void) {
   MX_USART3_UART_Init();
 }
 
-static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
-  uint8_t rx_buf[8] = {0};
+void UART_User_RxCpltCallback(UART_HandleTypeDef *huart) {
+  if (uart_test_rx_handle != NULL && huart == uart_test_rx_handle) {
+    uart_test_rx_done = 1;
+  }
+}
+
+void UART_User_ErrorCallback(UART_HandleTypeDef *huart) {
+  if (uart_test_rx_handle != NULL && huart == uart_test_rx_handle) {
+    uart_test_rx_error = 1;
+  }
+}
+
+static HAL_StatusTypeDef uart_test_run_direction(UART_HandleTypeDef *rx_uart, UART_HandleTypeDef *tx_uart, uint8_t tx1, const uint8_t *tx_packet, uint16_t len, const char *name) {
+  uint32_t wait_start;
+
+  if (len > UART_TEST_PACKET_LEN) {
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: неверная длина", name);
+    return HAL_ERROR;
+  }
+
+  memset(uart_test_rx_buf, 0, sizeof(uart_test_rx_buf));
+  uart_test_rx_done = 0;
+  uart_test_rx_error = 0;
+  uart_test_rx_handle = rx_uart;
 
   HAL_UART_Abort(rx_uart);
   HAL_UART_Abort(tx_uart);
 
   uart_test_set_rs485(tx1, tx1 ? 0 : 1);
-  osDelay(10);
+  osDelay(5);
 
-  if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
-    *ok = 0;
+  if (HAL_UART_Receive_IT(rx_uart, uart_test_rx_buf, len) != HAL_OK) {
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка старта RX IT", name);
+    uart_test_rx_handle = NULL;
+    return HAL_ERROR;
+  }
+
+  osDelay(2);
+
+  if (HAL_UART_Transmit(tx_uart, (uint8_t *)tx_packet, len, 100) != HAL_OK) {
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
-    return;
+    HAL_UART_AbortReceive(rx_uart);
+    uart_test_rx_handle = NULL;
+    return HAL_ERROR;
   }
 
-  osDelay(10);
-
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
-    *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
-    return;
+  wait_start = HAL_GetTick();
+  while (uart_test_rx_done == 0U && uart_test_rx_error == 0U) {
+    if ((HAL_GetTick() - wait_start) > UART_TEST_WAIT_MS) {
+      snprintf(uart_test_message, sizeof(uart_test_message), "%s: таймаут приема", name);
+      HAL_UART_AbortReceive(rx_uart);
+      uart_test_rx_handle = NULL;
+      return HAL_TIMEOUT;
+    }
+    osDelay(1);
   }
 
-  if (memcmp(rx_buf, packet, len) != 0) {
-    *ok = 0;
+  uart_test_rx_handle = NULL;
+
+  if (uart_test_rx_error != 0U) {
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка UART", name);
+    return HAL_ERROR;
+  }
+
+  if (memcmp(uart_test_rx_buf, tx_packet, len) != 0) {
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет не совпал", name);
-    return;
+    return HAL_ERROR;
   }
+
+  return HAL_OK;
 }
 
 static void main_task_thread(void *argument) {
@@ -737,43 +716,6 @@ static void main_task_thread(void *argument) {
   
   Menu_Navigate(&Menu_7);
   
-  modbus_t telegram_sensor_pressure = {
-    // function code
-    .u8fct = MB_FC_READ_REGISTERS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 1,
-  };
-  
-  modbus_t telegram_umvh = {
-    // function code
-    .u8fct = MB_FC_READ_REGISTERS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 9,
-    // pointer to a memory array
-    .u16reg = mb_reg_umvh,
-    // set the Modbus request parameters
-    .u8id = settings.umvh_id,
-  };
-  
-  modbus_t telegram_urm = {
-    // function code 15
-    .u8fct = MB_FC_WRITE_MULTIPLE_COILS,
-    // start address
-    .u16RegAdd = 0,
-    // number of elements to read
-    .u16CoilsNo = 16,
-    // pointer to a memory array
-    .u16reg = &mb_reg_urm,
-    // set the Modbus request parameters
-    .u8id = settings.urm_id,    
-  };
-  
-  uint32_t notification;
-  
   memset(mb_reg_pressure, 0, sizeof(mb_reg_pressure)/sizeof(mb_reg_pressure[0]));
   
   uint32_t tick = osKernelGetTickCount();
@@ -784,8 +726,8 @@ static void main_task_thread(void *argument) {
   
   osStatus_t status;
   uart_test_state_t uart_test_state = UART_TEST_IDLE;
-  const uint8_t uart_packet_a[6] = {0xA5, 0x5A, 0x01, 0x02, 0x03, 0x04};
-  const uint8_t uart_packet_b[6] = {0x3C, 0xC3, 0x10, 0x20, 0x30, 0x40};
+  const uint8_t uart_packet_a[UART_TEST_PACKET_LEN] = {0xA5, 0x5A, 0x01, 0x02, 0x03, 0x04};
+  const uint8_t uart_packet_b[UART_TEST_PACKET_LEN] = {0x3C, 0xC3, 0x10, 0x20, 0x30, 0x40};
   
   control_type_t control_id = CTRL_UNDEFINED;
   
@@ -835,11 +777,18 @@ static void main_task_thread(void *argument) {
     if (uart_test_state == UART_TEST_RUN) {
       uart_test_reinit();
 
-      uart_test_run_once(&huart1, &huart3, 1, uart_packet_a, sizeof(uart_packet_a), "UART1->UART3", (uint8_t *)&uart_test_ok);
-      if (uart_test_ok) {
-        osDelay(50);
-        uart_test_run_once(&huart3, &huart1, 0, uart_packet_b, sizeof(uart_packet_b), "UART3->UART1", (uint8_t *)&uart_test_ok);
+      if (uart_test_run_direction(&huart1, &huart3, 0, uart_packet_a, sizeof(uart_packet_a), "UART3->UART1") != HAL_OK) {
+        uart_test_ok = 0;
       }
+
+      if (uart_test_ok) {
+        osDelay(30);
+        uart_test_reinit();
+        if (uart_test_run_direction(&huart3, &huart1, 1, uart_packet_b, sizeof(uart_packet_b), "UART1->UART3") != HAL_OK) {
+          uart_test_ok = 0;
+        }
+      }
+
       uart_test_set_rs485(0, 0);
       HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
@@ -860,25 +809,13 @@ static void main_task_thread(void *argument) {
     zap[0] = HAL_GetTick();
 #endif
     
-    // read pressure sensor1
-    telegram_sensor_pressure.u8id = settings.sens1_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[MAINLINE];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[1] = HAL_GetTick();
-    zap[2] = zap[1] - zap[0];  
-#endif
-    
     if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[MAINLINE].state = STATE_ONLINE;
-        
-        oled_msg.pressure_sensor[MAINLINE].value = mb_reg_pressure[MAINLINE] / 100.0f;
-      }
+      oled_msg.pressure_sensor[MAINLINE].state = STATE_OFFLINE;
+      oled_msg.pressure_sensor[HYDRAULIC].state = STATE_OFFLINE;
+      oled_msg.valve.state = STATE_OFFLINE;
+      oled_msg.urm_state = STATE_OFFLINE;
+      oled_msg.umvh_state = STATE_OFFLINE;
+      oled_msg.position_state = STATE_OFFLINE;
       osSemaphoreRelease(msgSemaphore);
     }
     
@@ -886,40 +823,7 @@ static void main_task_thread(void *argument) {
     zap[3] = HAL_GetTick();
 #endif
     
-    // read pressure sensor2
-    telegram_sensor_pressure.u8id = settings.sens2_id;
-    telegram_sensor_pressure.u16reg = &mb_reg_pressure[HYDRAULIC];
-    
-    notification = modbus_query(&ModbusRS2, &telegram_sensor_pressure, 2);
-
-#ifdef DEBUG
-    zap[4] = HAL_GetTick();
-    zap[5] = zap[4] - zap[3];
-#endif
-    
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      if (notification != MB_ERR_OK) {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_OFFLINE;
-      } else {
-        oled_msg.pressure_sensor[HYDRAULIC].state = STATE_NORMAL;
-        
-        oled_msg.pressure_sensor[HYDRAULIC].value = mb_reg_pressure[HYDRAULIC] / 100.0f;
-        
-        // pressure outside the working range?
-        if (mb_reg_pressure[HYDRAULIC] < settings.sens2_min_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_BELOW_NORMAL;
-        } else if (mb_reg_pressure[HYDRAULIC] > settings.sens2_max_val) {
-          // error
-          oled_msg.pressure_sensor[HYDRAULIC].state = STATE_ABOVE_NORMAL;
-        }
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
-
-#ifdef DEBUG
-    zap[6] = HAL_GetTick();
-#endif
+    osDelay(2);
 
 /*    
     if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
@@ -934,46 +838,7 @@ static void main_task_thread(void *argument) {
     }
 */
 
-    notification = modbus_query(&ModbusRS2, &telegram_urm, 2);
-
-#ifdef DEBUG
-    zap[7] = HAL_GetTick();
-    zap[8] = zap[7] - zap[6];
-#endif
-    
-    if (notification != MB_ERR_OK) {
-      oled_msg.valve.state = STATE_OFFLINE;
-      oled_msg.urm_state = STATE_OFFLINE;
-    } else {
-      oled_msg.valve.state = STATE_ONLINE;
-      oled_msg.urm_state = STATE_ONLINE;
-    }
-    
-    //mb_reg_urm = 0;
-    
-#ifdef DEBUG
-    zap[9] = HAL_GetTick();
-#endif
-
-    // read displacement sensor and start signal
-    notification = modbus_query(&ModbusRS2, &telegram_umvh, 2);
-
-#ifdef DEBUG
-    zap[10] = HAL_GetTick();
-    zap[11] = zap[10] - zap[9];
-#endif
-
-    if (osSemaphoreAcquire(msgSemaphore, 2) == osOK) {
-      // offline
-      if (notification != MB_ERR_OK) {
-        oled_msg.umvh_state = STATE_OFFLINE;
-        oled_msg.position_state = STATE_OFFLINE;
-      } else {
-        oled_msg.umvh_state = STATE_ONLINE;
-        oled_msg.position_state = STATE_ONLINE;
-      }
-      osSemaphoreRelease(msgSemaphore);
-    }
+    osDelay(2);
     
     if (osSemaphoreAcquire(valve_controlSemaphore, 2) == osOK) {
       if (local_valve_control.tick < osKernelGetTickCount() || 
