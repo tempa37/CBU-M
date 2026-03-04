@@ -1,8 +1,17 @@
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
+#include "cmsis_os2.h"
 #include "task.h"
 #include "main.h"
 #include "Modbus.h"
+
+extern volatile uint8_t uart_test_active;
+extern UART_HandleTypeDef *uart_test_tx_handle;
+extern UART_HandleTypeDef *uart_test_rx_handle;
+extern osEventFlagsId_t uart_test_event_flags;
+
+#define UART_TEST_EVT_TX (1UL << 0)
+#define UART_TEST_EVT_RX (1UL << 1)
 
 /**
 * @brief
@@ -25,6 +34,10 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
   }
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU TX callback END
+
+  if (uart_test_active && huart == uart_test_tx_handle && uart_test_event_flags != NULL) {
+    osEventFlagsSet(uart_test_event_flags, UART_TEST_EVT_TX);
+  }
   
   // Here you should implement the callback code for other UARTs not used by Modbus
 }
@@ -53,6 +66,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
   }
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   // Modbus RTU RX callback END
+
+  if (uart_test_active && UartHandle == uart_test_rx_handle && uart_test_event_flags != NULL) {
+    osEventFlagsSet(uart_test_event_flags, UART_TEST_EVT_RX);
+  }
   
   // Here you should implement the callback code for other UARTs not used by Modbus
 }
