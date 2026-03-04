@@ -603,8 +603,15 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
     return;
   }
 
+  if (rx_uart->hdmarx == NULL) {
+    HAL_UART_AbortReceive(rx_uart);
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: RX DMA не сконфигурирован", name);
+    return;
+  }
+
   start_tick = HAL_GetTick();
-  while (HAL_UART_GetState(rx_uart) != HAL_UART_STATE_READY) {
+  while (__HAL_DMA_GET_COUNTER(rx_uart->hdmarx) > 0U) {
     if ((HAL_GetTick() - start_tick) > 1500U) {
       HAL_UART_AbortReceive(rx_uart);
       *ok = 0;
