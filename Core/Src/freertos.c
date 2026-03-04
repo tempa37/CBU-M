@@ -577,6 +577,14 @@ static void uart_test_reinit(void) {
   HAL_Delay(20);
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
+  
+  HAL_NVIC_EnableIRQ(USART1_IRQn);
+  HAL_NVIC_EnableIRQ(USART3_IRQn);
+  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+  
 }
 
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
@@ -587,7 +595,7 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   uart_test_prepare(tx_uart);
   osDelay(20);
 
-  uart_test_set_rs485(tx1, !tx1);
+  uart_test_set_rs485(!tx1, tx1);
   osDelay(10);
 
   if (HAL_UART_Receive_DMA(rx_uart, rx_buf, len) != HAL_OK) {
@@ -599,13 +607,15 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   osDelay(100);
   
   
-  if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
+  if (HAL_UART_Transmit_IT(tx_uart, (uint8_t *)packet, len) != HAL_OK) {
     *ok = 0;
     HAL_UART_AbortReceive(rx_uart);
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
     return;
   }
 
+  osDelay(100);
+  
   if (rx_uart->hdmarx == NULL) {
     HAL_UART_AbortReceive(rx_uart);
     *ok = 0;
