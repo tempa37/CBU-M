@@ -735,6 +735,7 @@ static void uart_test_reinit(void) {
 
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
   uint8_t rx_buf[8] = {0};
+  uint16_t rx_len = 0;
 
   uart_test_prepare(rx_uart);
   uart_test_prepare(tx_uart);
@@ -751,9 +752,15 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
 
   osDelay(10);
 
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
+  if (HAL_UARTEx_ReceiveToIdle(rx_uart, rx_buf, len, &rx_len, 1500) != HAL_OK) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
+    return;
+  }
+
+  if (rx_len != len) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: неверная длина (%u/%u)", name, rx_len, len);
     return;
   }
 
