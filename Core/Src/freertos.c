@@ -587,7 +587,7 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   uart_test_prepare(tx_uart);
   osDelay(20);
 
-  uart_test_set_rs485(!tx1, tx1);
+  uart_test_set_rs485(tx1, !tx1);
   osDelay(10);
 
   if (HAL_UART_Receive_DMA(rx_uart, rx_buf, len) != HAL_OK) {
@@ -596,6 +596,9 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
     return;
   }
 
+  osDelay(100);
+  
+  
   if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
     *ok = 0;
     HAL_UART_AbortReceive(rx_uart);
@@ -625,6 +628,10 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет не совпал", name);
     return;
+  }
+  else
+  {
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет совпал", name);
   }
 }
 
