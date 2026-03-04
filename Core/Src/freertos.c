@@ -200,6 +200,8 @@ volatile uint8_t uart_test_request = 0;
 volatile uint8_t uart_test_ready = 0;
 volatile uint8_t uart_test_ok = 0;
 char uart_test_message[96] = "Тест не запускался";
+/* DMA cannot access CCMRAM where FreeRTOS task stacks are allocated. */
+static uint8_t uart_test_rx_buf[8] = {0};
 
 typedef enum {
   UART_TEST_IDLE = 0,
@@ -588,8 +590,15 @@ static void uart_test_reinit(void) {
 }
 
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
-  uint8_t rx_buf[8] = {0};
   uint32_t start_tick = 0;
+
+  if (len > sizeof(uart_test_rx_buf)) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: длина пакета слишком большая", name);
+    return;
+  }
+
+  memset(uart_test_rx_buf, 0, len);
 
   uart_test_prepare(rx_uart);
   uart_test_prepare(tx_uart);
@@ -598,7 +607,7 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   uart_test_set_rs485(!tx1, tx1);
   osDelay(10);
 
-  if (HAL_UART_Receive_DMA(rx_uart, rx_buf, len) != HAL_OK) {
+  if (HAL_UART_Receive_DMA(rx_uart, uart_test_rx_buf, len) != HAL_OK) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка запуска DMA приема", name);
     return;
@@ -634,7 +643,7 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
     osDelay(1);
   }
 
-  if (memcmp(rx_buf, packet, len) != 0) {
+  if (memcmp(uart_test_rx_buf, packet, len) != 0) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет не совпал", name);
     return;
