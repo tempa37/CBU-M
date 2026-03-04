@@ -327,8 +327,6 @@ void MX_FREERTOS_Init(void) {
   
   keyboard_task_handle = osThreadNew(keyboard_thread, NULL, &keyboard_task_handle_attr);
 
-  httpd_task_handle = osThreadNew(http_server_thread, NULL, &httpd_task_handle_attr);
- 
   modbus_tcp_start();
   //
   modbus_rtu_start();
@@ -468,9 +466,12 @@ static void startDefaultTask(void *argument) {
   HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_RESET);
   osDelay(100);
   HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_SET);
+  osDelay(300);
 
   // init code for LWIP
   MX_LWIP_Init();
+
+  httpd_task_handle = osThreadNew(http_server_thread, NULL, &httpd_task_handle_attr);
   
   osStatus_t status;
   

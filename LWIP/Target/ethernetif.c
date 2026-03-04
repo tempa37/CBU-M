@@ -50,6 +50,7 @@
 /* ETH Setting  */
 #define ETH_DMA_TRANSMIT_TIMEOUT               ( 20U )
 #define ETH_TX_BUFFER_MAX             ((ETH_TX_DESC_CNT) * 2U)
+#define ETH_TX_SEMAPHORE_TIMEOUT_MS            ( 1000U )
 
 /* USER CODE BEGIN 1 */
 
@@ -273,9 +274,15 @@ static void low_level_init(struct netif *netif)
 
 /* USER CODE END PHY_PRE_CONFIG */
   /* Set PHY IO functions */
-  LAN8710_RegisterBusIO(&LAN8710, &LAN8710_IOCtx);
+  if (LAN8710_RegisterBusIO(&LAN8710, &LAN8710_IOCtx) != 0)
+  {
+    Error_Handler();
+  }
   /* Initialize the DP83848 ETH PHY */
-  LAN8710_Init(&LAN8710);
+  if (LAN8710_Init(&LAN8710) != 0)
+  {
+    Error_Handler();
+  }
 
   if (hal_eth_init_status == HAL_OK)
   {
@@ -397,16 +404,26 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
   TxConfig.TxBuffer = Txbuffer;
   TxConfig.pData = p;
 
+  if (!netif_is_link_up(netif))
+  {
+    return ERR_CONN;
+  }
+
   pbuf_ref(p);
 
   if (HAL_ETH_Transmit_IT(&heth, &TxConfig) == HAL_OK) {
-    while(osSemaphoreAcquire(TxPktSemaphore, TIME_WAITING_FOR_INPUT)!=osOK)
-
+    if (osSemaphoreAcquire(TxPktSemaphore, ETH_TX_SEMAPHORE_TIMEOUT_MS) == osOK)
     {
+      HAL_ETH_ReleaseTxPacket(&heth);
     }
-
-    HAL_ETH_ReleaseTxPacket(&heth);
+    else
+    {
+      errval = ERR_TIMEOUT;
+      HAL_ETH_ReleaseTxPacket(&heth);
+      pbuf_free(p);
+    }
   } else {
+    errval = ERR_IF;
     pbuf_free(p);
   }
 
@@ -945,4 +962,3 @@ void HAL_ETH_TxFreeCallback(uint32_t * buff)
 /* USER CODE BEGIN 8 */
 
 /* USER CODE END 8 */
-
