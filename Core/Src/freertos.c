@@ -581,6 +581,7 @@ static void uart_test_reinit(void) {
 
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
   uint8_t rx_buf[8] = {0};
+  uint32_t start_tick = 0;
 
   uart_test_prepare(rx_uart);
   uart_test_prepare(tx_uart);
@@ -589,21 +590,28 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   uart_test_set_rs485(!tx1, tx1);
   osDelay(10);
 
+  if (HAL_UART_Receive_DMA(rx_uart, rx_buf, len) != HAL_OK) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка запуска DMA приема", name);
+    return;
+  }
+
   if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
     *ok = 0;
+    HAL_UART_AbortReceive(rx_uart);
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
     return;
   }
 
-  osDelay(10);
-
-  
-  HAL_StatusTypeDef st = HAL_UART_Receive(rx_uart, rx_buf, len, 1500);
-  
-  if(st != HAL_OK) {
-    *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
-    return;
+  start_tick = HAL_GetTick();
+  while (HAL_UART_GetState(rx_uart) != HAL_UART_STATE_READY) {
+    if ((HAL_GetTick() - start_tick) > 1500U) {
+      HAL_UART_AbortReceive(rx_uart);
+      *ok = 0;
+      snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
+      return;
+    }
+    osDelay(1);
   }
 
   if (memcmp(rx_buf, packet, len) != 0) {
