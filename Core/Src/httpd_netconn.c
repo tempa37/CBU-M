@@ -244,6 +244,44 @@ void status_sys(struct netconn *conn) {
     length_html += sprintf((char*)(html + length_html), "\"emer\":\"%d\",", oled_msg.emer_state);
     length_html += sprintf((char*)(html + length_html), "\"urm\":\"%d\",", oled_msg.urm_state);
     length_html += sprintf((char*)(html + length_html), "\"umvh\":\"%d\",", oled_msg.umvh_state);
+
+    length_html += sprintf((char*)(html + length_html), "\"menu_id\":\"%d\",", oled_msg.menu_id);
+    length_html += sprintf((char*)(html + length_html), "\"value1\":\"%.2f\",", oled_msg.value1);
+    length_html += sprintf((char*)(html + length_html), "\"value2\":\"%.2f\",", oled_msg.value2);
+    length_html += sprintf((char*)(html + length_html), "\"value3\":\"%d\",", oled_msg.value3);
+    length_html += sprintf((char*)(html + length_html), "\"value4\":\"%d\",", oled_msg.value4);
+    length_html += sprintf((char*)(html + length_html), "\"value5\":\"%d\",", oled_msg.value5);
+
+    length_html += sprintf((char*)(html + length_html), "\"pin_value\":\"%d\",", oled_msg.pin.value);
+    length_html += sprintf((char*)(html + length_html), "\"pin0\":\"%d\",", oled_msg.pin.pin0);
+    length_html += sprintf((char*)(html + length_html), "\"pin1\":\"%d\",", oled_msg.pin.pin1);
+    length_html += sprintf((char*)(html + length_html), "\"pin2\":\"%d\",", oled_msg.pin.pin2);
+    length_html += sprintf((char*)(html + length_html), "\"pin4\":\"%d\",", oled_msg.pin.pin4);
+
+    length_html += sprintf((char*)(html + length_html), "\"title\":\"%s\",", oled_msg.title != NULL ? oled_msg.title : "");
+    length_html += sprintf((char*)(html + length_html), "\"sub_title\":\"%s\",", oled_msg.sub_title != NULL ? oled_msg.sub_title : "");
+
+    length_html += sprintf((char*)(html + length_html), "\"pressure_sensor_mainline_state\":\"%d\",", oled_msg.pressure_sensor[MAINLINE].state);
+    length_html += sprintf((char*)(html + length_html), "\"pressure_sensor_mainline_value\":\"%.2f\",", oled_msg.pressure_sensor[MAINLINE].value);
+    length_html += sprintf((char*)(html + length_html), "\"pressure_sensor_mainline_min_value\":\"%.2f\",", oled_msg.pressure_sensor[MAINLINE].min_value);
+    length_html += sprintf((char*)(html + length_html), "\"pressure_sensor_mainline_max_value\":\"%.2f\",", oled_msg.pressure_sensor[MAINLINE].max_value);
+
+    length_html += sprintf((char*)(html + length_html), "\"pressure_sensor_hydraulic_state\":\"%d\",", oled_msg.pressure_sensor[HYDRAULIC].state);
+    length_html += sprintf((char*)(html + length_html), "\"pressure_sensor_hydraulic_value\":\"%.2f\",", oled_msg.pressure_sensor[HYDRAULIC].value);
+    length_html += sprintf((char*)(html + length_html), "\"pressure_sensor_hydraulic_min_value\":\"%.2f\",", oled_msg.pressure_sensor[HYDRAULIC].min_value);
+    length_html += sprintf((char*)(html + length_html), "\"pressure_sensor_hydraulic_max_value\":\"%.2f\",", oled_msg.pressure_sensor[HYDRAULIC].max_value);
+
+    length_html += sprintf((char*)(html + length_html), "\"valve_state\":\"%d\",", oled_msg.valve.state);
+    length_html += sprintf((char*)(html + length_html), "\"valve_value_out\":\"%d\",", oled_msg.valve.value_out);
+    length_html += sprintf((char*)(html + length_html), "\"valve_out_up\":\"%d\",", oled_msg.valve.out_up);
+    length_html += sprintf((char*)(html + length_html), "\"valve_out_down\":\"%d\",", oled_msg.valve.out_down);
+
+    length_html += sprintf((char*)(html + length_html), "\"state_in\":\"%d\",", oled_msg.state_in);
+    length_html += sprintf((char*)(html + length_html), "\"state_out\":\"%d\",", oled_msg.state_out);
+    length_html += sprintf((char*)(html + length_html), "\"position\":\"%d\",", oled_msg.position);
+    length_html += sprintf((char*)(html + length_html), "\"position_state\":\"%d\",", oled_msg.position_state);
+    length_html += sprintf((char*)(html + length_html), "\"save_state\":\"%d\",", oled_msg.save_state);
+    length_html += sprintf((char*)(html + length_html), "\"system_control_mode\":\"%d\",", oled_msg.system_control_mode);
     
     length_html += sprintf((char*)(html + length_html), "\"uptime\":\"%d\"}", HAL_GetTick()/1000);
    
