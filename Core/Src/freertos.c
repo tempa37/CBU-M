@@ -200,6 +200,9 @@ volatile uint8_t uart_test_request = 0;
 volatile uint8_t uart_test_ready = 0;
 volatile uint8_t uart_test_ok = 0;
 char uart_test_message[96] = "Тест не запускался";
+volatile uint8_t uart_test_rx_done = 0;
+volatile uint8_t uart_test_rx_error = 0;
+UART_HandleTypeDef *uart_test_rx_target = NULL;
 
 typedef enum {
   UART_TEST_IDLE = 0,
@@ -530,11 +533,9 @@ selftest_t test_sensor = {0};
  */
 
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
-  HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
-  HAL_Delay(20);
   HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, tx1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
   HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, tx3 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_Delay(20);
 }
 
 static void uart_test_prepare(UART_HandleTypeDef *uart) {
@@ -590,33 +591,30 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   uart_test_set_rs485(tx1, !tx1);
   osDelay(10);
 
-  if (HAL_UART_Receive_DMA(rx_uart, rx_buf, len) != HAL_OK) {
+  uart_test_rx_done = 0;
+  uart_test_rx_error = 0;
+  uart_test_rx_target = rx_uart;
+
+  if (HAL_UART_Receive_IT(rx_uart, rx_buf, len) != HAL_OK) {
     *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка запуска DMA приема", name);
+    uart_test_rx_target = NULL;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка запуска RX IT", name);
     return;
   }
 
-  osDelay(100);
-  
-  
   if (HAL_UART_Transmit(tx_uart, (uint8_t *)packet, len, 100) != HAL_OK) {
     *ok = 0;
     HAL_UART_AbortReceive(rx_uart);
+    uart_test_rx_target = NULL;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка передачи", name);
     return;
   }
 
-  if (rx_uart->hdmarx == NULL) {
-    HAL_UART_AbortReceive(rx_uart);
-    *ok = 0;
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: RX DMA не сконфигурирован", name);
-    return;
-  }
-
   start_tick = HAL_GetTick();
-  while (__HAL_DMA_GET_COUNTER(rx_uart->hdmarx) > 0U) {
+  while (!uart_test_rx_done && !uart_test_rx_error) {
     if ((HAL_GetTick() - start_tick) > 1500U) {
       HAL_UART_AbortReceive(rx_uart);
+      uart_test_rx_target = NULL;
       *ok = 0;
       snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
       return;
@@ -624,15 +622,21 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
     osDelay(1);
   }
 
+  uart_test_rx_target = NULL;
+
+  if (uart_test_rx_error) {
+    *ok = 0;
+    snprintf(uart_test_message, sizeof(uart_test_message), "%s: ошибка UART (0x%08lX)", name, (unsigned long)rx_uart->ErrorCode);
+    return;
+  }
+
   if (memcmp(rx_buf, packet, len) != 0) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет не совпал", name);
     return;
   }
-  else
-  {
-    snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет совпал", name);
-  }
+
+  snprintf(uart_test_message, sizeof(uart_test_message), "%s: пакет совпал", name);
 }
 
 static void main_task_thread(void *argument) {
@@ -708,8 +712,6 @@ static void main_task_thread(void *argument) {
         uart_test_run_once(&huart3, &huart1, 0, uart_packet_b, sizeof(uart_packet_b), "UART3->UART1", (uint8_t *)&uart_test_ok);
       }
       uart_test_set_rs485(0, 0);
-      HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
       if (uart_test_ok) {
         snprintf(uart_test_message, sizeof(uart_test_message), "UART1<->UART3 OK");
       }
@@ -959,6 +961,18 @@ void delayed_start_callback(void *argument) {
   switch_state = 1;
 }
 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  if (huart == uart_test_rx_target) {
+    uart_test_rx_done = 1;
+  }
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+  if (huart == uart_test_rx_target) {
+    uart_test_rx_error = 1;
+  }
+}
+
 static void ring_line_thread(void *argument) {
   (void) argument;
 
