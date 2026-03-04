@@ -690,6 +690,40 @@ static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
   HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, tx3 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
+static void uart_test_prepare(UART_HandleTypeDef *uart) {
+  volatile uint32_t sr = 0;
+  volatile uint32_t dr = 0;
+
+  HAL_UART_Abort(uart);
+
+  __HAL_UART_CLEAR_PEFLAG(uart);
+  __HAL_UART_CLEAR_FEFLAG(uart);
+  __HAL_UART_CLEAR_NEFLAG(uart);
+  __HAL_UART_CLEAR_OREFLAG(uart);
+  __HAL_UART_CLEAR_IDLEFLAG(uart);
+  __HAL_UART_CLEAR_FLAG(uart, UART_FLAG_TC);
+
+#ifdef UART_FLAG_CTS
+  __HAL_UART_CLEAR_FLAG(uart, UART_FLAG_CTS);
+#endif
+
+  while (__HAL_UART_GET_FLAG(uart, UART_FLAG_RXNE) != RESET) {
+    dr = uart->Instance->DR;
+    (void)dr;
+  }
+
+  if (__HAL_UART_GET_FLAG(uart, UART_FLAG_ORE) != RESET) {
+    sr = uart->Instance->SR;
+    dr = uart->Instance->DR;
+    (void)sr;
+    (void)dr;
+  }
+
+#if defined(USART_SR_WUF)
+  __HAL_UART_CLEAR_FLAG(uart, USART_SR_WUF);
+#endif
+}
+
 static void uart_test_reinit(void) {
   HAL_UART_DeInit(&huart1);
   HAL_UART_DeInit(&huart3);
@@ -701,8 +735,9 @@ static void uart_test_reinit(void) {
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok) {
   uint8_t rx_buf[8] = {0};
 
-  HAL_UART_Abort(rx_uart);
-  HAL_UART_Abort(tx_uart);
+  uart_test_prepare(rx_uart);
+  uart_test_prepare(tx_uart);
+  osDelay(20);
 
   uart_test_set_rs485(tx1, tx1 ? 1 : 0);
   osDelay(10);
