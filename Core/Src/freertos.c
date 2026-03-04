@@ -327,7 +327,7 @@ void MX_FREERTOS_Init(void) {
   
   keyboard_task_handle = osThreadNew(keyboard_thread, NULL, &keyboard_task_handle_attr);
 
-  modbus_tcp_start();
+  
   //
   modbus_rtu_start();
 
@@ -462,17 +462,12 @@ static void modbus_rtu_start(void) {
 static void startDefaultTask(void *argument) {
   (void) argument;
 
-  // reset lan8710
-  HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_RESET);
-  osDelay(100);
-  HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_SET);
-  osDelay(300);
 
   // init code for LWIP
   MX_LWIP_Init();
 
   httpd_task_handle = osThreadNew(http_server_thread, NULL, &httpd_task_handle_attr);
-  
+  modbus_tcp_start();
   osStatus_t status;
   
   //button_t button = {0};
@@ -751,7 +746,10 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
 
   osDelay(10);
 
-  if (HAL_UART_Receive(rx_uart, rx_buf, len, 1500) != HAL_OK) {
+  
+  HAL_StatusTypeDef st = HAL_UART_Receive(rx_uart, rx_buf, len, 1500);
+  
+  if(st != HAL_OK) {
     *ok = 0;
     snprintf(uart_test_message, sizeof(uart_test_message), "%s: нет приема", name);
     return;

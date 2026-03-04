@@ -114,6 +114,14 @@ int main(void) {
   MX_TIM14_Init();
   Start_IT_TIM12();
   
+    // reset lan8710
+  HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_RESET);
+  HAL_Delay(2000);
+  HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_SET);
+  HAL_Delay(2000);
+
+  
+  
   //MX_RTC_Init();
   
   // Init scheduler
