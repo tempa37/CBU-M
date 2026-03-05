@@ -549,15 +549,30 @@ static int post_state_machine(struct netconn* conn, char* buf, u16_t buflen) {
       if (buf) {
         post_data.state = POST_STATE_BODY;
         post_data.accum_length = 0;
+        memset(post_data.content, 0, sizeof(post_data.content));
         ret = STATUS_INPROGRESS;
       }
       break;
     }
     case POST_STATE_BODY: {
-      uint32_t len = buf_end - buf;
+      uint32_t len = (uint32_t)(buf_end - buf);
+      uint32_t copy_len = len;
+      uint32_t remaining = 0U;
       ret = STATUS_INPROGRESS;
-      memcpy(post_data.content, buf, len);
-      post_data.accum_length += len;
+      if (post_data.content_length > post_data.accum_length) {
+        remaining = post_data.content_length - post_data.accum_length;
+      }
+      if (copy_len > remaining) {
+        copy_len = remaining;
+      }
+      if ((post_data.accum_length + copy_len) >= sizeof(post_data.content)) {
+        copy_len = sizeof(post_data.content) - 1U - post_data.accum_length;
+      }
+      if (copy_len > 0U) {
+        memcpy(post_data.content + post_data.accum_length, buf, copy_len);
+        post_data.accum_length += copy_len;
+      }
+      post_data.content[post_data.accum_length] = 0;
       if (ret == STATUS_INPROGRESS) {
         if (post_data.accum_length >= post_data.content_length) {
           if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
