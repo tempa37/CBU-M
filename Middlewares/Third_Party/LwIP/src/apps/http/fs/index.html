@@ -78,6 +78,30 @@ background-color: #dff2ef;
 font-weight: bold;
 min-width: 70px;
 }
+.pin-btn {
+width: 80px;
+height: 30px;
+border: 1px solid #7ea69a;
+border-radius: 4px;
+color: #ffffff;
+font-weight: bold;
+cursor: default;
+}
+.pin-btn.pin-on {
+background-color: #2b9b47;
+}
+.pin-btn.pin-off {
+background-color: #c65353;
+}
+.pin-btn.pin-pending {
+background-color: #c1841f;
+}
+.pin-btn:disabled {
+opacity: 1;
+}
+.pin-btn.manual-active {
+cursor: pointer;
+}
 </style>
 <title>Web РєРѕРЅС„РёРіСѓСЂР°С‚РѕСЂ</title>
 </head>
@@ -398,6 +422,35 @@ min-width: 70px;
 </tbody>
 </table>
 </div>
+<div class="elem0">
+<div class="left_col">&#1088;&#1091;&#1095;&#1085;&#1086;&#1077; &#1091;&#1087;&#1088;&#1072;&#1074;&#1083;&#1077;&#1085;&#1080;&#1077; &#1087;&#1080;&#1085;&#1072;&#1084;&#1080;</div>
+<div class="right_col"><button id="manual-pins-toggle" type="button">&#1056;&#1072;&#1079;&#1074;&#1077;&#1088;&#1085;&#1091;&#1090;&#1100;</button></div>
+</div>
+<div id="manual-pins-content" class="hide">
+<table class="pins-table">
+<thead>
+<tr>
+<th>Pin</th>
+<th>Name</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>MODE</td><td>&#1088;&#1091;&#1095;&#1085;&#1086;&#1077; &#1091;&#1087;&#1088;&#1072;&#1074;&#1083;&#1077;&#1085;&#1080;&#1077; &#1087;&#1080;&#1085;&#1072;&#1084;&#1080;</td><td><button id="manual-mode-btn" type="button" class="pin-btn pin-off">&#1042;&#1099;&#1082;&#1083;</button></td></tr>
+<tr><td>PB2 (WDI)</td><td>Watchdog</td><td><button id="manual-pin-out_wdi" type="button" class="pin-btn pin-off" data-pin-name="wdi" data-state-key="out_wdi" disabled>0</button></td></tr>
+<tr><td>PC12 (UART1_RE_DE)</td><td>RS-485 CH1 RE/DE</td><td><button id="manual-pin-out_uart1_re_de" type="button" class="pin-btn pin-off" data-pin-name="uart1_re_de" data-state-key="out_uart1_re_de" disabled>0</button></td></tr>
+<tr><td>PA11 (UART2_RE_DE)</td><td>RS-485 CH2 RE/DE</td><td><button id="manual-pin-out_uart2_re_de" type="button" class="pin-btn pin-off" data-pin-name="uart2_re_de" data-state-key="out_uart2_re_de" disabled>0</button></td></tr>
+<tr><td>PE5 (PWR_KTV)</td><td>KTV power</td><td><button id="manual-pin-out_pwr_ktv" type="button" class="pin-btn pin-off" data-pin-name="pwr_ktv" data-state-key="out_pwr_ktv" disabled>0</button></td></tr>
+<tr><td>PC8 (RST_PHYLAN)</td><td>PHY LAN reset</td><td><button id="manual-pin-out_rst_phylan" type="button" class="pin-btn pin-off" data-pin-name="rst_phylan" data-state-key="out_rst_phylan" disabled>0</button></td></tr>
+<tr><td>PD9 (STM_LOOP_LINK)</td><td>Loop link output</td><td><button id="manual-pin-out_stm_loop_link" type="button" class="pin-btn pin-off" data-pin-name="stm_loop_link" data-state-key="out_stm_loop_link" disabled>0</button></td></tr>
+<tr><td>PD13 (ANA_RELE_2)</td><td>Analog relay 2</td><td><button id="manual-pin-out_ana_rele_2" type="button" class="pin-btn pin-off" data-pin-name="ana_rele_2" data-state-key="out_ana_rele_2" disabled>0</button></td></tr>
+<tr><td>PE10 (OLED_DC)</td><td>OLED DC</td><td><button id="manual-pin-out_oled_dc" type="button" class="pin-btn pin-off" data-pin-name="oled_dc" data-state-key="out_oled_dc" disabled>0</button></td></tr>
+<tr><td>PE11 (OLED_CS)</td><td>OLED CS</td><td><button id="manual-pin-out_oled_cs" type="button" class="pin-btn pin-off" data-pin-name="oled_cs" data-state-key="out_oled_cs" disabled>0</button></td></tr>
+<tr><td>PE15 (OLED_RST)</td><td>OLED reset</td><td><button id="manual-pin-out_oled_rst" type="button" class="pin-btn pin-off" data-pin-name="oled_rst" data-state-key="out_oled_rst" disabled>0</button></td></tr>
+<tr><td>PB15</td><td>PB15 output</td><td><button id="manual-pin-out_pb15" type="button" class="pin-btn pin-off" data-pin-name="pb15" data-state-key="out_pb15" disabled>0</button></td></tr>
+</tbody>
+</table>
+</div>
 <hr/>
 </div>
 
@@ -413,24 +466,61 @@ min-width: 70px;
 
 <script>
 
-function initPinStateToggle() {
-	let pinsToggle = document.getElementById("pins-toggle");
-	let pinsContent = document.getElementById("pins-content");
-	if (pinsToggle != null && pinsContent != null) {
-		pinsToggle.addEventListener("click", function() {
-			pinsContent.classList.toggle("hide");
-			let isHidden = pinsContent.classList.contains("hide");
-			pinsToggle.innerHTML = isHidden ? "Р Р°Р·РІРµСЂРЅСѓС‚СЊ" : "РЎРІРµСЂРЅСѓС‚СЊ";
-			if (isHidden) {
-				stopPinsPolling();
-			} else {
-				startPinsPolling();
+const TEXT_EXPAND = "\u0420\u0430\u0437\u0432\u0435\u0440\u043d\u0443\u0442\u044c";
+const TEXT_COLLAPSE = "\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c";
+const TEXT_ON = "\u0412\u043a\u043b";
+const TEXT_OFF = "\u0412\u044b\u043a\u043b";
+
+const manualPinsConfig = [
+	{ buttonId: "manual-pin-out_wdi", stateKey: "out_wdi", pinName: "wdi" },
+	{ buttonId: "manual-pin-out_uart1_re_de", stateKey: "out_uart1_re_de", pinName: "uart1_re_de" },
+	{ buttonId: "manual-pin-out_uart2_re_de", stateKey: "out_uart2_re_de", pinName: "uart2_re_de" },
+	{ buttonId: "manual-pin-out_pwr_ktv", stateKey: "out_pwr_ktv", pinName: "pwr_ktv" },
+	{ buttonId: "manual-pin-out_rst_phylan", stateKey: "out_rst_phylan", pinName: "rst_phylan" },
+	{ buttonId: "manual-pin-out_stm_loop_link", stateKey: "out_stm_loop_link", pinName: "stm_loop_link" },
+	{ buttonId: "manual-pin-out_ana_rele_2", stateKey: "out_ana_rele_2", pinName: "ana_rele_2" },
+	{ buttonId: "manual-pin-out_oled_dc", stateKey: "out_oled_dc", pinName: "oled_dc" },
+	{ buttonId: "manual-pin-out_oled_cs", stateKey: "out_oled_cs", pinName: "oled_cs" },
+	{ buttonId: "manual-pin-out_oled_rst", stateKey: "out_oled_rst", pinName: "oled_rst" },
+	{ buttonId: "manual-pin-out_pb15", stateKey: "out_pb15", pinName: "pb15" }
+];
+
+let pinsPollTimer = null;
+let latestPinsState = null;
+let manualModeState = 0;
+let pendingManualMode = null;
+let pendingPinStates = {};
+let pendingTimers = {};
+
+function isSectionExpanded(contentId) {
+	let content = document.getElementById(contentId);
+	return content != null && !content.classList.contains("hide");
+}
+
+function hasPendingManualRequests() {
+	return pendingManualMode !== null || Object.keys(pendingPinStates).length > 0;
+}
+
+function initCollapsibleSection(toggleId, contentId) {
+	let toggle = document.getElementById(toggleId);
+	let content = document.getElementById(contentId);
+	if (toggle != null && content != null) {
+		toggle.addEventListener("click", function() {
+			content.classList.toggle("hide");
+			let isHidden = content.classList.contains("hide");
+			toggle.innerHTML = isHidden ? TEXT_EXPAND : TEXT_COLLAPSE;
+			updatePinsPollingState();
+			if (!isHidden) {
+				requestPinsState();
 			}
 		});
 	}
 }
 
-let pinsPollTimer = null;
+function initPinStateToggle() {
+	initCollapsibleSection("pins-toggle", "pins-content");
+	initCollapsibleSection("manual-pins-toggle", "manual-pins-content");
+}
 
 function setPinValue(elementId, value) {
 	let elem = document.getElementById(elementId);
@@ -439,10 +529,64 @@ function setPinValue(elementId, value) {
 	}
 }
 
+function setButtonState(button, value, enabled, pending, isModeButton) {
+	if (button == null) {
+		return;
+	}
+	button.classList.remove("pin-on");
+	button.classList.remove("pin-off");
+	button.classList.remove("pin-pending");
+	button.classList.remove("manual-active");
+
+	let normalized = Number(value) === 1 ? 1 : 0;
+	if (pending) {
+		button.classList.add("pin-pending");
+	} else {
+		button.classList.add(normalized === 1 ? "pin-on" : "pin-off");
+	}
+
+	if (isModeButton) {
+		button.textContent = normalized === 1 ? TEXT_ON : TEXT_OFF;
+	} else {
+		button.textContent = normalized === 1 ? "1" : "0";
+	}
+
+	button.disabled = isModeButton ? false : (!enabled || pending);
+	if (!button.disabled) {
+		button.classList.add("manual-active");
+	}
+}
+
+function clearPendingTimer(key) {
+	if (pendingTimers[key] != null) {
+		clearTimeout(pendingTimers[key]);
+		delete pendingTimers[key];
+	}
+}
+
+function renderManualControls() {
+	let modeButton = document.getElementById("manual-mode-btn");
+	setButtonState(modeButton, manualModeState, true, pendingManualMode !== null, true);
+
+	manualPinsConfig.forEach(function(cfg) {
+		let btn = document.getElementById(cfg.buttonId);
+		let value = 0;
+		if (latestPinsState != null && latestPinsState[cfg.stateKey] !== undefined) {
+			value = Number(latestPinsState[cfg.stateKey]) === 1 ? 1 : 0;
+		}
+		let pending = Object.prototype.hasOwnProperty.call(pendingPinStates, cfg.stateKey);
+		let enabled = manualModeState === 1 && pendingManualMode === null;
+		setButtonState(btn, value, enabled, pending, false);
+	});
+}
+
 function renderPinsState(data) {
 	if (data == null) {
 		return;
 	}
+	latestPinsState = data;
+	manualModeState = Number(data.manual_mode) === 1 ? 1 : 0;
+
 	setPinValue("pin-pe3", data.pe3);
 	setPinValue("pin-pe4", data.pe4);
 	setPinValue("pin-pd14", data.pd14);
@@ -454,11 +598,29 @@ function renderPinsState(data) {
 	setPinValue("pin-pd8", data.pd8);
 	setPinValue("pin-pa15", data.pa15);
 	setPinValue("pin-pc9", data.pc9);
+
+	if (pendingManualMode !== null && manualModeState === pendingManualMode) {
+		clearPendingTimer("manual_mode");
+		pendingManualMode = null;
+	}
+
+	manualPinsConfig.forEach(function(cfg) {
+		if (Object.prototype.hasOwnProperty.call(pendingPinStates, cfg.stateKey)) {
+			let expected = Number(pendingPinStates[cfg.stateKey]) === 1 ? 1 : 0;
+			let actual = Number(data[cfg.stateKey]) === 1 ? 1 : 0;
+			if (expected === actual) {
+				clearPendingTimer(cfg.stateKey);
+				delete pendingPinStates[cfg.stateKey];
+			}
+		}
+	});
+
+	renderManualControls();
+	updatePinsPollingState();
 }
 
 function requestPinsState() {
-	let pinsContent = document.getElementById("pins-content");
-	if (pinsContent == null || pinsContent.classList.contains("hide")) {
+	if (!isSectionExpanded("pins-content") && !isSectionExpanded("manual-pins-content") && !hasPendingManualRequests()) {
 		return;
 	}
 	let xhr = new XMLHttpRequest();
@@ -495,6 +657,120 @@ function stopPinsPolling() {
 	}
 }
 
+function updatePinsPollingState() {
+	if (isSectionExpanded("pins-content") || isSectionExpanded("manual-pins-content") || hasPendingManualRequests()) {
+		startPinsPolling();
+	} else {
+		stopPinsPolling();
+	}
+}
+
+function sendManualPinsCommand(payload, onSuccess, onError) {
+	let xhr = new XMLHttpRequest();
+	xhr.open("POST", "/pins_control", true);
+	xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+	xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+	xhr.timeout = 2500;
+	xhr.onload = function() {
+		if (xhr.status == 200) {
+			if (onSuccess != null) {
+				onSuccess();
+			}
+		} else if (onError != null) {
+			onError();
+		}
+	};
+	xhr.onerror = function() {
+		if (onError != null) {
+			onError();
+		}
+	};
+	xhr.send(JSON.stringify(payload));
+}
+
+function onManualModeButtonClick() {
+	if (pendingManualMode !== null) {
+		return;
+	}
+	let targetMode = manualModeState === 1 ? 0 : 1;
+	pendingManualMode = targetMode;
+	renderManualControls();
+	updatePinsPollingState();
+
+	clearPendingTimer("manual_mode");
+	pendingTimers["manual_mode"] = setTimeout(function() {
+		if (pendingManualMode !== null) {
+			pendingManualMode = null;
+			renderManualControls();
+			updatePinsPollingState();
+			alert("Нет подтверждения режима ручного управления");
+		}
+	}, 5000);
+
+	sendManualPinsCommand({ manual_mode: targetMode }, function() {
+		requestPinsState();
+	}, function() {
+		clearPendingTimer("manual_mode");
+		pendingManualMode = null;
+		renderManualControls();
+		updatePinsPollingState();
+		alert("Не удалось переключить режим ручного управления");
+	});
+}
+
+function onManualPinButtonClick(cfg) {
+	if (manualModeState !== 1 || pendingManualMode !== null) {
+		return;
+	}
+
+	let currentValue = 0;
+	if (latestPinsState != null && latestPinsState[cfg.stateKey] !== undefined) {
+		currentValue = Number(latestPinsState[cfg.stateKey]) === 1 ? 1 : 0;
+	}
+	let targetValue = currentValue === 1 ? 0 : 1;
+	pendingPinStates[cfg.stateKey] = targetValue;
+	renderManualControls();
+	updatePinsPollingState();
+
+	clearPendingTimer(cfg.stateKey);
+	pendingTimers[cfg.stateKey] = setTimeout(function() {
+		if (Object.prototype.hasOwnProperty.call(pendingPinStates, cfg.stateKey)) {
+			delete pendingPinStates[cfg.stateKey];
+			renderManualControls();
+			updatePinsPollingState();
+			alert("Нет подтверждения изменения пина " + cfg.pinName);
+		}
+	}, 5000);
+
+	sendManualPinsCommand({ pin: cfg.pinName, value: targetValue }, function() {
+		requestPinsState();
+	}, function() {
+		clearPendingTimer(cfg.stateKey);
+		if (Object.prototype.hasOwnProperty.call(pendingPinStates, cfg.stateKey)) {
+			delete pendingPinStates[cfg.stateKey];
+		}
+		renderManualControls();
+		updatePinsPollingState();
+		alert("Не удалось изменить пин " + cfg.pinName);
+	});
+}
+
+function initManualControls() {
+	let modeButton = document.getElementById("manual-mode-btn");
+	if (modeButton != null) {
+		modeButton.addEventListener("click", onManualModeButtonClick);
+	}
+	manualPinsConfig.forEach(function(cfg) {
+		let btn = document.getElementById(cfg.buttonId);
+		if (btn != null) {
+			btn.addEventListener("click", function() {
+				onManualPinButtonClick(cfg);
+			});
+		}
+	});
+	renderManualControls();
+}
+
 async function up() {
 	let count = 4;
 	for (let n = 1; n <= count; n++) {
@@ -503,7 +779,7 @@ async function up() {
 			document.getElementById(`button${n}`).addEventListener("click", function() {
 				let sel_frame = document.getElementById(`group${n}`);
 				sel_frame.classList.toggle("hide");
-				sel_button.innerHTML == "РЎРїСЂСЏС‚Р°С‚СЊ" ? sel_button.innerHTML = "РџРѕРєР°Р·Р°С‚СЊ" : sel_button.innerHTML = "РЎРїСЂСЏС‚Р°С‚СЊ";
+				sel_button.innerHTML == "Спрятать" ? sel_button.innerHTML = "Показать" : sel_button.innerHTML = "Спрятать";
 			});
 			document.getElementById(`frame${n}`).style.display = "block";
 			let p = document.querySelector(`#group${n}`);
@@ -511,14 +787,17 @@ async function up() {
 		}
 	}
 }
+
 up();
-initPinStateToggle();
 window.onload = function() {
 	State1();
 	let uartBtn = document.getElementById("uart-test-btn");
 	if (uartBtn != null) {
 		uartBtn.addEventListener("click", StartUartTest);
 	}
+	initPinStateToggle();
+	initManualControls();
+	updatePinsPollingState();
 }
 </script>
 </html>

@@ -30,6 +30,10 @@ static void fwupdate_send_success(struct netconn* conn, const char* str);
 static int jsoneq(const char *json, jsmntok_t *tok, const char *s);
 static void stage_set(struct netconn *conn, uint8_t config);
 static void stage_pins(struct netconn *conn);
+static void manual_pin_write_by_name(const char *pin_name, uint8_t value);
+static uint8_t manual_pin_read_pb15(void);
+
+volatile uint8_t manual_pins_mode = 0U;
 //void stage_load(struct netconn *conn);
 
 static const unsigned char PAGE_HEADER_200_OK[] = {
@@ -282,6 +286,42 @@ void stage_state(struct netconn *conn) {
  * detailed description
  */
 
+static uint8_t manual_pin_read_pb15(void) {
+  return (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15) == GPIO_PIN_SET) ? 1U : 0U;
+}
+
+static void manual_pin_write_by_name(const char *pin_name, uint8_t value) {
+  GPIO_PinState pin_state = (value != 0U) ? GPIO_PIN_SET : GPIO_PIN_RESET;
+
+  if (pin_name == NULL) {
+    return;
+  }
+
+  if (strcmp(pin_name, "wdi") == 0) {
+    HAL_GPIO_WritePin(WDI_GPIO_Port, WDI_Pin, pin_state);
+  } else if (strcmp(pin_name, "uart1_re_de") == 0) {
+    HAL_GPIO_WritePin(UART1_RE_DE_Port, UART1_RE_DE_Pin, pin_state);
+  } else if (strcmp(pin_name, "uart2_re_de") == 0) {
+    HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, pin_state);
+  } else if (strcmp(pin_name, "pwr_ktv") == 0) {
+    HAL_GPIO_WritePin(PWR_KTV_GPIO_Port, PWR_KTV_Pin, pin_state);
+  } else if (strcmp(pin_name, "rst_phylan") == 0) {
+    HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, pin_state);
+  } else if (strcmp(pin_name, "stm_loop_link") == 0) {
+    HAL_GPIO_WritePin(STM_LOOP_LINK_GPIO_Port, STM_LOOP_LINK_Pin, pin_state);
+  } else if (strcmp(pin_name, "ana_rele_2") == 0) {
+    HAL_GPIO_WritePin(ANA_RELE_2_GPIO_Port, ANA_RELE_2_Pin, pin_state);
+  } else if (strcmp(pin_name, "oled_dc") == 0) {
+    HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, pin_state);
+  } else if (strcmp(pin_name, "oled_cs") == 0) {
+    HAL_GPIO_WritePin(OLED_CS_GPIO_Port, OLED_CS_Pin, pin_state);
+  } else if (strcmp(pin_name, "oled_rst") == 0) {
+    HAL_GPIO_WritePin(OLED_RST_GPIO_Port, OLED_RST_Pin, pin_state);
+  } else if (strcmp(pin_name, "pb15") == 0) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, pin_state);
+  }
+}
+
 static void stage_pins(struct netconn *conn) {
   if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
     uint8_t pe3 = (HAL_GPIO_ReadPin(BDU1_M_S_GPIO_Port, BDU1_M_S_Pin) == GPIO_PIN_SET) ? 1U : 0U;
@@ -296,6 +336,18 @@ static void stage_pins(struct netconn *conn) {
     uint8_t pa15 = (HAL_GPIO_ReadPin(RS485_1_ON_Port, RS485_1_ON_Pin) == GPIO_PIN_SET) ? 1U : 0U;
     uint8_t pc9 = (HAL_GPIO_ReadPin(RS485_2_ON_Port, RS485_2_ON_Pin) == GPIO_PIN_SET) ? 1U : 0U;
 
+    uint8_t out_wdi = (HAL_GPIO_ReadPin(WDI_GPIO_Port, WDI_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_uart1_re_de = (HAL_GPIO_ReadPin(UART1_RE_DE_Port, UART1_RE_DE_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_uart2_re_de = (HAL_GPIO_ReadPin(UART2_RE_DE_Port, UART2_RE_DE_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_pwr_ktv = (HAL_GPIO_ReadPin(PWR_KTV_GPIO_Port, PWR_KTV_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_rst_phylan = (HAL_GPIO_ReadPin(RST_PHYLAN_Port, RST_PHYLAN_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_stm_loop_link = (HAL_GPIO_ReadPin(STM_LOOP_LINK_GPIO_Port, STM_LOOP_LINK_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_ana_rele_2 = (HAL_GPIO_ReadPin(ANA_RELE_2_GPIO_Port, ANA_RELE_2_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_oled_dc = (HAL_GPIO_ReadPin(OLED_DC_GPIO_Port, OLED_DC_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_oled_cs = (HAL_GPIO_ReadPin(OLED_CS_GPIO_Port, OLED_CS_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_oled_rst = (HAL_GPIO_ReadPin(OLED_RST_GPIO_Port, OLED_RST_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t out_pb15 = manual_pin_read_pb15();
+
     memset(html, 0, HTML_LEN);
     length_html = 0;
 
@@ -309,7 +361,20 @@ static void stage_pins(struct netconn *conn) {
     length_html += sprintf((char*)(html + length_html), "\"pd10\":%u,", pd10);
     length_html += sprintf((char*)(html + length_html), "\"pd8\":%u,", pd8);
     length_html += sprintf((char*)(html + length_html), "\"pa15\":%u,", pa15);
-    length_html += sprintf((char*)(html + length_html), "\"pc9\":%u}", pc9);
+    length_html += sprintf((char*)(html + length_html), "\"pc9\":%u,", pc9);
+
+    length_html += sprintf((char*)(html + length_html), "\"manual_mode\":%u,", manual_pins_mode);
+    length_html += sprintf((char*)(html + length_html), "\"out_wdi\":%u,", out_wdi);
+    length_html += sprintf((char*)(html + length_html), "\"out_uart1_re_de\":%u,", out_uart1_re_de);
+    length_html += sprintf((char*)(html + length_html), "\"out_uart2_re_de\":%u,", out_uart2_re_de);
+    length_html += sprintf((char*)(html + length_html), "\"out_pwr_ktv\":%u,", out_pwr_ktv);
+    length_html += sprintf((char*)(html + length_html), "\"out_rst_phylan\":%u,", out_rst_phylan);
+    length_html += sprintf((char*)(html + length_html), "\"out_stm_loop_link\":%u,", out_stm_loop_link);
+    length_html += sprintf((char*)(html + length_html), "\"out_ana_rele_2\":%u,", out_ana_rele_2);
+    length_html += sprintf((char*)(html + length_html), "\"out_oled_dc\":%u,", out_oled_dc);
+    length_html += sprintf((char*)(html + length_html), "\"out_oled_cs\":%u,", out_oled_cs);
+    length_html += sprintf((char*)(html + length_html), "\"out_oled_rst\":%u,", out_oled_rst);
+    length_html += sprintf((char*)(html + length_html), "\"out_pb15\":%u}", out_pb15);
 
     send_response(conn);
 
@@ -441,6 +506,7 @@ static int post_state_machine(struct netconn* conn, char* buf, u16_t buflen) {
   while (buf && buf < buf_end) {
     switch (post_data.state) {
     case POST_STATE_HEADER: {
+      post_data.url = 0;
 /*
       if ((buflen >= 19) && (strncmp(buf, "POST /configuration", 19) == 0)) {
         post_data.url = 1;
@@ -452,6 +518,8 @@ static int post_state_machine(struct netconn* conn, char* buf, u16_t buflen) {
         post_data.url = 3;
       } else if ((buflen >= 12) && (strncmp(buf, "POST /tuning", 12) == 0)) {
         post_data.url = 4;
+      } else if ((buflen >= 18) && (strncmp(buf, "POST /pins_control", 18) == 0)) {
+        post_data.url = 5;
       }
       if (post_data.url > 0) {
         ret = STATUS_ERROR;
@@ -1087,6 +1155,53 @@ static void http_server(struct netconn *conn) {
 
                   }
                 } // if (post_data.url == 4)
+                // POST /pins_control
+                if (post_data.url == 5) {
+                  jsmn_parser p;
+                  char pin_name[24] = {0};
+                  uint8_t pin_value = 0U;
+                  bool has_pin_name = false;
+                  bool has_pin_value = false;
+                  bool has_manual_mode = false;
+                  uint8_t manual_mode_value = 0U;
+                  uint16_t pin_name_len = 0U;
+
+                  memset(token, 0, sizeof(jsmntok_t) * TOK_LENGTH);
+                  jsmn_init(&p);
+                  int count = jsmn_parse(&p, post_data.content, strlen(post_data.content), token, TOK_LENGTH);
+                  if (count > 0) {
+                    for (uint8_t i = 1; i < count; i++) {
+                      if (jsoneq(post_data.content, &token[i], "manual_mode") == 0) {
+                        memset((void *)tmp, 0, 16);
+                        memcpy((void *)tmp, (void *)(post_data.content + token[i + 1].start), token[i + 1].end - token[i + 1].start);
+                        manual_mode_value = (atoi(tmp) != 0) ? 1U : 0U;
+                        has_manual_mode = true;
+                      } else if (jsoneq(post_data.content, &token[i], "pin") == 0) {
+                        memset((void *)pin_name, 0, sizeof(pin_name));
+                        pin_name_len = (uint16_t)(token[i + 1].end - token[i + 1].start);
+                        if (pin_name_len >= sizeof(pin_name)) {
+                          pin_name_len = sizeof(pin_name) - 1U;
+                        }
+                        memcpy((void *)pin_name, (void *)(post_data.content + token[i + 1].start), pin_name_len);
+                        pin_name[pin_name_len] = 0;
+                        has_pin_name = true;
+                      } else if (jsoneq(post_data.content, &token[i], "value") == 0) {
+                        memset((void *)tmp, 0, 16);
+                        memcpy((void *)tmp, (void *)(post_data.content + token[i + 1].start), token[i + 1].end - token[i + 1].start);
+                        pin_value = (atoi(tmp) != 0) ? 1U : 0U;
+                        has_pin_value = true;
+                      }
+                    }
+
+                    if (has_manual_mode) {
+                      manual_pins_mode = manual_mode_value;
+                    }
+
+                    if (manual_pins_mode != 0U && has_pin_name && has_pin_value) {
+                      manual_pin_write_by_name(pin_name, pin_value);
+                    }
+                  }
+                } // if (post_data.url == 5)
               } // (ret == POST_STATUS_DONE)
             }
           }

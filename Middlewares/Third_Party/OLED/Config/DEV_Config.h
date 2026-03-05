@@ -29,14 +29,14 @@
 #define IIC_RAM 0X40
 
 //OLED GPIO
-#define OLED_CS_0 HAL_GPIO_WritePin(OLED_CS_GPIO_Port, OLED_CS_Pin, GPIO_PIN_RESET)
-#define OLED_CS_1 HAL_GPIO_WritePin(OLED_CS_GPIO_Port, OLED_CS_Pin, GPIO_PIN_SET)
+#define OLED_CS_0 do { if (manual_pins_mode == 0U) HAL_GPIO_WritePin(OLED_CS_GPIO_Port, OLED_CS_Pin, GPIO_PIN_RESET); } while (0)
+#define OLED_CS_1 do { if (manual_pins_mode == 0U) HAL_GPIO_WritePin(OLED_CS_GPIO_Port, OLED_CS_Pin, GPIO_PIN_SET); } while (0)
 
-#define OLED_DC_0 HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, GPIO_PIN_RESET)
-#define OLED_DC_1 HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, GPIO_PIN_SET)
+#define OLED_DC_0 do { if (manual_pins_mode == 0U) HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, GPIO_PIN_RESET); } while (0)
+#define OLED_DC_1 do { if (manual_pins_mode == 0U) HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, GPIO_PIN_SET); } while (0)
 
-#define OLED_RST_0 HAL_GPIO_WritePin(OLED_RST_GPIO_Port, OLED_RST_Pin, GPIO_PIN_RESET)
-#define OLED_RST_1 HAL_GPIO_WritePin(OLED_RST_GPIO_Port, OLED_RST_Pin, GPIO_PIN_SET)
+#define OLED_RST_0 do { if (manual_pins_mode == 0U) HAL_GPIO_WritePin(OLED_RST_GPIO_Port, OLED_RST_Pin, GPIO_PIN_RESET); } while (0)
+#define OLED_RST_1 do { if (manual_pins_mode == 0U) HAL_GPIO_WritePin(OLED_RST_GPIO_Port, OLED_RST_Pin, GPIO_PIN_SET); } while (0)
 
 /*------------------------------------------------------------------------------------------------------*/
 

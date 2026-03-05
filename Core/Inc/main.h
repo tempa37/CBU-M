@@ -168,6 +168,8 @@ void Error_Handler(void);
 #define K9_Pin GPIO_PIN_1
 #define K9_Port GPIOD
 
+extern volatile uint8_t manual_pins_mode;
+
 #ifdef __cplusplus
 }
 #endif

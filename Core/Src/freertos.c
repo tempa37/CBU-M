@@ -323,7 +323,9 @@ static void wdi_thread(void *argument) {
     wd_tick++;
 #endif
     osDelay(2000);
-    HAL_GPIO_TogglePin(WDI_GPIO_Port, WDI_Pin);
+    if (manual_pins_mode == 0U) {
+      HAL_GPIO_TogglePin(WDI_GPIO_Port, WDI_Pin);
+    }
   }
 }
 
@@ -532,6 +534,10 @@ selftest_t test_sensor = {0};
  */
 
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3) {
+  if (manual_pins_mode != 0U) {
+    return;
+  }
+
   HAL_GPIO_WritePin(RS485_1_ON_Port, RS485_1_ON_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(RS485_2_ON_Port, RS485_2_ON_Pin, GPIO_PIN_RESET);
   HAL_Delay(20);

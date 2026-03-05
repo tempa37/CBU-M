@@ -1,4 +1,4 @@
-﻿#include "main.h"
+#include "main.h"
 
 #include "string.h"
 #include "tim.h"
@@ -50,7 +50,9 @@ void KTV_Init() {
   gKtvTickCount = 0;
 #endif
   memset((void *)Bitmap, 0, sizeof(Bitmap));
-  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
+  if (manual_pins_mode == 0U) {
+    HAL_GPIO_WritePin(PWR_KTV_GPIO_Port, PWR_KTV_Pin, GPIO_PIN_SET);
+  }
   Counter = KTV_BOOTUP_INTERVAL / MS_IN_TICK;
   // Start timer, period = 0.5 quantum
   Start_IT_TIM14();
@@ -63,7 +65,9 @@ void KTV_Init() {
  */
 void KTV_Start() {
 #ifdef KTV_START_PULSE
-  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
+  if (manual_pins_mode == 0U) {
+    HAL_GPIO_WritePin(PWR_KTV_GPIO_Port, PWR_KTV_Pin, GPIO_PIN_RESET);
+  }
 #endif
   Counter = TICK_NUM_KTV_START;
   State = ksStPulse;
@@ -248,7 +252,9 @@ void KTV_SetTickValue(uint8_t val) {
     break;
   case ksStPulse:
     if (--Counter <= 0) {
-      HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
+      if (manual_pins_mode == 0U) {
+        HAL_GPIO_WritePin(PWR_KTV_GPIO_Port, PWR_KTV_Pin, GPIO_PIN_SET);
+      }
 #ifdef PRE_SYNC_INT 
       Counter = TICK_NUM_TO_SYNC;
       State = ksSync;
