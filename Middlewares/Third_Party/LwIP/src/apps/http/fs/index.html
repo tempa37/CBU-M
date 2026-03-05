@@ -408,10 +408,10 @@ cursor: pointer;
 </tr>
 </thead>
 <tbody>
-<tr><td>PE3 (BDU1_M/S)</td><td>–í–∫–ª. –ë–ö–ö –∫.1</td><td id="pin-pe3" class="pin-value">-</td></tr>
-<tr><td>PE4 (BDU2_M/S)</td><td>–í–∫–ª. –ë–ö–ö –∫.2</td><td id="pin-pe4" class="pin-value">-</td></tr>
-<tr><td>PD14 (ANA_RELE_1)</td><td>–†–µ–ª–µ –ë–ö–ö 1: –õ–æ–≥0 - –∫–æ–Ω—Ç—É—Ä –≤ –ø–æ—Ä—è–¥–∫–µ, –õ–æ–≥1 - –∫–æ–Ω—Ç—É—Ä –æ—à–∏–±–∫–∞</td><td id="pin-pd14" class="pin-value">-</td></tr>
-<tr><td>PD12 (MCU_BLK_2_1)</td><td>–†–µ–ª–µ –ë–ö–ö 2: –õ–æ–≥0 - –∫–æ–Ω—Ç—É—Ä –≤ –ø–æ—Ä—è–¥–∫–µ, –õ–æ–≥1 - –∫–æ–Ω—Ç—É—Ä –æ—à–∏–±–∫–∞</td><td id="pin-pd12" class="pin-value">-</td></tr>
+<tr><td>PE3 (BDU1_M_S)</td><td>–í–∫–ª. –ë–ö–ö –∫.1</td><td id="pin-pe3" class="pin-value">-</td></tr>
+<tr><td>PE4 (BDU2_M_S)</td><td>–í–∫–ª. –ë–ö–ö –∫.2</td><td id="pin-pe4" class="pin-value">-</td></tr>
+<tr><td>PD14 (CON_1)</td><td>–†–µ–ª–µ –ë–ö–ö 1: –õ–æ–≥0 - –∫–æ–Ω—Ç—É—Ä –≤ –ø–æ—Ä—è–¥–∫–µ, –õ–æ–≥1 - –∫–æ–Ω—Ç—É—Ä –æ—à–∏–±–∫–∞</td><td id="pin-pd14" class="pin-value">-</td></tr>
+<tr><td>PD12 (CON_2)</td><td>–†–µ–ª–µ –ë–ö–ö 2: –õ–æ–≥0 - –∫–æ–Ω—Ç—É—Ä –≤ –ø–æ—Ä—è–¥–∫–µ, –õ–æ–≥1 - –∫–æ–Ω—Ç—É—Ä –æ—à–∏–±–∫–∞</td><td id="pin-pd12" class="pin-value">-</td></tr>
 <tr><td>PC6 (MCU_BLK_1_1)</td><td>–û–ø—Ç—Ä–æ–Ω 1.1 (–ø–æ–∫–∞ –Ω–µ –∏—Å–ø–æ–ª—å–∑—É–µ–º)</td><td id="pin-pc6" class="pin-value">-</td></tr>
 <tr><td>PD15 (MCU_BLK_1_2)</td><td>–û–ø—Ç—Ä–æ–Ω 1.2 (–ø–æ–∫–∞ –Ω–µ –∏—Å–ø–æ–ª—å–∑—É–µ–º)</td><td id="pin-pd15" class="pin-value">-</td></tr>
 <tr><td>PD11 (MCU_BLK_2_1)</td><td>–û–ø—Ç—Ä–æ–Ω 2.1 (–ø–æ–∫–∞ –Ω–µ –∏—Å–ø–æ–ª—å–∑—É–µ–º)</td><td id="pin-pd11" class="pin-value">-</td></tr>
@@ -677,12 +677,12 @@ function sendManualPinsCommand(payload, onSuccess, onError) {
 				onSuccess();
 			}
 		} else if (onError != null) {
-			onError();
+			onError(xhr.status);
 		}
 	};
 	xhr.onerror = function() {
 		if (onError != null) {
-			onError();
+			onError(0);
 		}
 	};
 	xhr.send(JSON.stringify(payload));
@@ -703,18 +703,18 @@ function onManualModeButtonClick() {
 			pendingManualMode = null;
 			renderManualControls();
 			updatePinsPollingState();
-			alert("ÕÂÚ ÔÓ‰Ú‚ÂÊ‰ÂÌËˇ ÂÊËÏ‡ Û˜ÌÓ„Ó ÛÔ‡‚ÎÂÌËˇ");
+			alert("\u041d\u0435\u0442 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f \u0440\u0435\u0436\u0438\u043c\u0430 \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f");
 		}
 	}, 5000);
 
-	sendManualPinsCommand({ manual_mode: targetMode }, function() {
+	sendManualPinsCommand({ manual_mode: targetMode }, function(status) {
 		requestPinsState();
-	}, function() {
+	}, function(status) {
 		clearPendingTimer("manual_mode");
 		pendingManualMode = null;
 		renderManualControls();
 		updatePinsPollingState();
-		alert("ÕÂ Û‰‡ÎÓÒ¸ ÔÂÂÍÎ˛˜ËÚ¸ ÂÊËÏ Û˜ÌÓ„Ó ÛÔ‡‚ÎÂÌËˇ");
+		alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0440\u0435\u0436\u0438\u043c \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f" + (status > 0 ? " (HTTP " + status + ")" : ""));
 	});
 }
 
@@ -738,20 +738,20 @@ function onManualPinButtonClick(cfg) {
 			delete pendingPinStates[cfg.stateKey];
 			renderManualControls();
 			updatePinsPollingState();
-			alert("ÕÂÚ ÔÓ‰Ú‚ÂÊ‰ÂÌËˇ ËÁÏÂÌÂÌËˇ ÔËÌ‡ " + cfg.pinName);
+			alert("\u041d\u0435\u0442 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u043f\u0438\u043d\u0430 " + cfg.pinName);
 		}
 	}, 5000);
 
-	sendManualPinsCommand({ pin: cfg.pinName, value: targetValue }, function() {
+	sendManualPinsCommand({ pin: cfg.pinName, value: targetValue }, function(status) {
 		requestPinsState();
-	}, function() {
+	}, function(status) {
 		clearPendingTimer(cfg.stateKey);
 		if (Object.prototype.hasOwnProperty.call(pendingPinStates, cfg.stateKey)) {
 			delete pendingPinStates[cfg.stateKey];
 		}
 		renderManualControls();
 		updatePinsPollingState();
-		alert("ÕÂ Û‰‡ÎÓÒ¸ ËÁÏÂÌËÚ¸ ÔËÌ " + cfg.pinName);
+		alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u043f\u0438\u043d " + cfg.pinName + (status > 0 ? " (HTTP " + status + ")" : ""));
 	});
 }
 
