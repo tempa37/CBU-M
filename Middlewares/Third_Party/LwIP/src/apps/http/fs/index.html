@@ -59,6 +59,25 @@ margin-bottom: 5px;
 margin-right: 0px;
 background-color: #dff2ef;
 }
+.pins-table {
+width: 100%;
+border-collapse: collapse;
+background-color: #f3faf8;
+margin: 6px 0;
+}
+.pins-table th, .pins-table td {
+border: 1px solid #b6d5cd;
+padding: 6px;
+text-align: left;
+font-size: 14px;
+}
+.pins-table th {
+background-color: #dff2ef;
+}
+.pin-value {
+font-weight: bold;
+min-width: 70px;
+}
 </style>
 <title>Web конфигуратор</title>
 </head>
@@ -356,22 +375,28 @@ background-color: #dff2ef;
 <div class="right_col"><button id="pins-toggle" type="button">Развернуть</button></div>
 </div>
 <div id="pins-content" class="hide">
-<div class="elem0">
-<div class="left_col">PIN 1</div>
-<div class="right_col">-</div>
-</div>
-<div class="elem0">
-<div class="left_col">PIN 2</div>
-<div class="right_col">-</div>
-</div>
-<div class="elem0">
-<div class="left_col">PIN 3</div>
-<div class="right_col">-</div>
-</div>
-<div class="elem0">
-<div class="left_col">PIN 4</div>
-<div class="right_col">-</div>
-</div>
+<table class="pins-table">
+<thead>
+<tr>
+<th>Пин</th>
+<th>Название</th>
+<th>Состояние</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>PE3 (BDU1_M/S)</td><td>Вкл. БКК к.1</td><td id="pin-pe3" class="pin-value">-</td></tr>
+<tr><td>PE4 (BDU2_M/S)</td><td>Вкл. БКК к.2</td><td id="pin-pe4" class="pin-value">-</td></tr>
+<tr><td>PD14 (ANA_RELE_1)</td><td>Реле БКК 1: Лог0 - контур в порядке, Лог1 - контур ошибка</td><td id="pin-pd14" class="pin-value">-</td></tr>
+<tr><td>PD12 (MCU_BLK_2_1)</td><td>Реле БКК 2: Лог0 - контур в порядке, Лог1 - контур ошибка</td><td id="pin-pd12" class="pin-value">-</td></tr>
+<tr><td>PC6 (MCU_BLK_1_1)</td><td>Оптрон 1.1 (пока не используем)</td><td id="pin-pc6" class="pin-value">-</td></tr>
+<tr><td>PD15 (MCU_BLK_1_2)</td><td>Оптрон 1.2 (пока не используем)</td><td id="pin-pd15" class="pin-value">-</td></tr>
+<tr><td>PD11 (MCU_BLK_2_1)</td><td>Оптрон 2.1 (пока не используем)</td><td id="pin-pd11" class="pin-value">-</td></tr>
+<tr><td>PD10 (MCU_BLK_2_2)</td><td>Оптрон 2.2 (пока не используем)</td><td id="pin-pd10" class="pin-value">-</td></tr>
+<tr><td>PD8 (CON_ON_OFF)</td><td>Ошибка связи: Лог0 - норма (SB4.1 и STM_LOOP_LINK одинаково), Лог1 - норма (SB4.1 и STM_LOOP_LINK рассогласованы)</td><td id="pin-pd8" class="pin-value">-</td></tr>
+<tr><td>PA15 (RS485_1_ON)</td><td>ПИРС 1: Лог1 - ПИРС на связи, Лог0 - связи нет</td><td id="pin-pa15" class="pin-value">-</td></tr>
+<tr><td>PC9 (RS485_2_ON)</td><td>ПИРС 2: Лог1 - ПИРС на связи, Лог0 - связи нет</td><td id="pin-pc9" class="pin-value">-</td></tr>
+</tbody>
+</table>
 </div>
 <hr/>
 </div>
@@ -394,8 +419,79 @@ function initPinStateToggle() {
 	if (pinsToggle != null && pinsContent != null) {
 		pinsToggle.addEventListener("click", function() {
 			pinsContent.classList.toggle("hide");
-			pinsToggle.innerHTML = pinsContent.classList.contains("hide") ? "Развернуть" : "Свернуть";
+			let isHidden = pinsContent.classList.contains("hide");
+			pinsToggle.innerHTML = isHidden ? "Развернуть" : "Свернуть";
+			if (isHidden) {
+				stopPinsPolling();
+			} else {
+				startPinsPolling();
+			}
 		});
+	}
+}
+
+let pinsPollTimer = null;
+
+function setPinValue(elementId, value) {
+	let elem = document.getElementById(elementId);
+	if (elem != null) {
+		elem.textContent = value;
+	}
+}
+
+function renderPinsState(data) {
+	if (data == null) {
+		return;
+	}
+	setPinValue("pin-pe3", data.pe3);
+	setPinValue("pin-pe4", data.pe4);
+	setPinValue("pin-pd14", data.pd14);
+	setPinValue("pin-pd12", data.pd12);
+	setPinValue("pin-pc6", data.pc6);
+	setPinValue("pin-pd15", data.pd15);
+	setPinValue("pin-pd11", data.pd11);
+	setPinValue("pin-pd10", data.pd10);
+	setPinValue("pin-pd8", data.pd8);
+	setPinValue("pin-pa15", data.pa15);
+	setPinValue("pin-pc9", data.pc9);
+}
+
+function requestPinsState() {
+	let pinsContent = document.getElementById("pins-content");
+	if (pinsContent == null || pinsContent.classList.contains("hide")) {
+		return;
+	}
+	let xhr = new XMLHttpRequest();
+	xhr.open("GET", "/pins.json", true);
+	xhr.timeout = 1500;
+	xhr.onload = function() {
+		if (xhr.status == 200 && xhr.responseText.length > 0) {
+			try {
+				let data = JSON.parse(xhr.responseText);
+				renderPinsState(data);
+			} catch (e) {
+				console.log("Pins JSON parse error");
+			}
+		}
+	};
+	xhr.onerror = function() {
+		console.log("Pins state request failed");
+	};
+	xhr.send();
+}
+
+function startPinsPolling() {
+	if (pinsPollTimer != null) {
+		return;
+	}
+	requestPinsState();
+	pinsPollTimer = setInterval(requestPinsState, 1000);
+}
+
+function stopPinsPolling() {
+	if (pinsPollTimer != null) {
+		clearInterval(pinsPollTimer);
+		pinsPollTimer = null;
 	}
 }
 

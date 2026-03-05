@@ -13,6 +13,7 @@
 #include "tcp.h"
 #include "global_types.h"
 #include "manage_settings.h"
+#include "main.h"
 
 
 // for function mktime() & difftime()
@@ -28,6 +29,7 @@ static int fwupdate_state_machine(struct netconn* conn, char* buf, u16_t buflen)
 static void fwupdate_send_success(struct netconn* conn, const char* str);
 static int jsoneq(const char *json, jsmntok_t *tok, const char *s);
 static void stage_set(struct netconn *conn, uint8_t config);
+static void stage_pins(struct netconn *conn);
 //void stage_load(struct netconn *conn);
 
 static const unsigned char PAGE_HEADER_200_OK[] = {
@@ -279,6 +281,41 @@ void stage_state(struct netconn *conn) {
  *
  * detailed description
  */
+
+static void stage_pins(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    uint8_t pe3 = (HAL_GPIO_ReadPin(BDU1_M_S_GPIO_Port, BDU1_M_S_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pe4 = (HAL_GPIO_ReadPin(BDU2_M_S_GPIO_Port, BDU2_M_S_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pd14 = (HAL_GPIO_ReadPin(CON_1_Port, CON_1_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pd12 = (HAL_GPIO_ReadPin(CON_2_Port, CON_2_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pc6 = (HAL_GPIO_ReadPin(MCU_BLK_1_1_GPIO_Port, MCU_BLK_1_1_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pd15 = (HAL_GPIO_ReadPin(MCU_BLK_1_2_GPIO_Port, MCU_BLK_1_2_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pd11 = (HAL_GPIO_ReadPin(MCU_BLK_2_1_GPIO_Port, MCU_BLK_2_1_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pd10 = (HAL_GPIO_ReadPin(MCU_BLK_2_2_GPIO_Port, MCU_BLK_2_2_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pd8 = (HAL_GPIO_ReadPin(CON_ON_OFF_GPIO_Port, CON_ON_OFF_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pa15 = (HAL_GPIO_ReadPin(RS485_1_ON_Port, RS485_1_ON_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    uint8_t pc9 = (HAL_GPIO_ReadPin(RS485_2_ON_Port, RS485_2_ON_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+
+    memset(html, 0, HTML_LEN);
+    length_html = 0;
+
+    length_html += sprintf((char*)(html + length_html), "{\"pe3\":%u,", pe3);
+    length_html += sprintf((char*)(html + length_html), "\"pe4\":%u,", pe4);
+    length_html += sprintf((char*)(html + length_html), "\"pd14\":%u,", pd14);
+    length_html += sprintf((char*)(html + length_html), "\"pd12\":%u,", pd12);
+    length_html += sprintf((char*)(html + length_html), "\"pc6\":%u,", pc6);
+    length_html += sprintf((char*)(html + length_html), "\"pd15\":%u,", pd15);
+    length_html += sprintf((char*)(html + length_html), "\"pd11\":%u,", pd11);
+    length_html += sprintf((char*)(html + length_html), "\"pd10\":%u,", pd10);
+    length_html += sprintf((char*)(html + length_html), "\"pd8\":%u,", pd8);
+    length_html += sprintf((char*)(html + length_html), "\"pa15\":%u,", pa15);
+    length_html += sprintf((char*)(html + length_html), "\"pc9\":%u}", pc9);
+
+    send_response(conn);
+
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
 void stage_set(struct netconn *conn, uint8_t config) {
   if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
     memset(html, 0, HTML_LEN);
@@ -784,6 +821,9 @@ static void http_server(struct netconn *conn) {
           }
           else if (strncmp(buf, "GET /info.json", 14) == 0) {
             status_sys(conn);
+          }
+          else if (strncmp(buf, "GET /pins.json", 14) == 0) {
+            stage_pins(conn);
           }
           else if (strncmp(buf, "GET /uart_test_start", 20) == 0) {
             uart_test_start(conn);

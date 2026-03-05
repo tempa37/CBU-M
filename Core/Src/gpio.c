@@ -52,13 +52,11 @@ void MX_GPIO_Init(void) {
     
     HAL_GPIO_WritePin(WDI_GPIO_Port, WDI_Pin, GPIO_PIN_RESET);
     
-    HAL_GPIO_WritePin(GPIOD, STM_LOOP_LINK_Pin, GPIO_PIN_RESET);
-    
     HAL_GPIO_WritePin(GPIOC, RST_PHYLAN_Pin|UART1_RE_DE_Pin, GPIO_PIN_RESET);
     
     HAL_GPIO_WritePin(UART2_RE_DE_Port, UART2_RE_DE_Pin, GPIO_PIN_RESET);
     
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_9|ANA_RELE_2_Pin, GPIO_PIN_RESET); 
+    HAL_GPIO_WritePin(GPIOD, STM_LOOP_LINK_Pin|ANA_RELE_2_Pin, GPIO_PIN_RESET);
   }
   
   GPIO_InitStruct.Pin = INT_LAN8710_Pin;
