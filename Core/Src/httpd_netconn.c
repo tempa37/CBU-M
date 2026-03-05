@@ -32,8 +32,13 @@ static void stage_set(struct netconn *conn, uint8_t config);
 static void stage_pins(struct netconn *conn);
 static void manual_pin_write_by_name(const char *pin_name, uint8_t value);
 static uint8_t manual_pin_read_pb15(void);
+static void relay_test_set_mode(uint8_t enable);
+static void relay_test_drive(uint8_t value);
 
 volatile uint8_t manual_pins_mode = 0U;
+volatile uint8_t relay_test_mode = 0U;
+static uint8_t relay_test_prev_pd13 = 0U;
+static uint8_t relay_test_prev_pb15 = 0U;
 //void stage_load(struct netconn *conn);
 
 static const unsigned char PAGE_HEADER_200_OK[] = {
@@ -322,6 +327,48 @@ static void manual_pin_write_by_name(const char *pin_name, uint8_t value) {
   }
 }
 
+static void relay_test_set_mode(uint8_t enable) {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  if (enable != 0U) {
+    relay_test_prev_pd13 = (HAL_GPIO_ReadPin(ANA_RELE_2_GPIO_Port, ANA_RELE_2_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+    relay_test_prev_pb15 = manual_pin_read_pb15();
+
+    GPIO_InitStruct.Pin = CON_1_Pin|CON_2_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    HAL_GPIO_WritePin(CON_1_Port, CON_1_Pin|CON_2_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(ANA_RELE_2_GPIO_Port, ANA_RELE_2_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);
+
+    manual_pins_mode = 0U;
+    relay_test_mode = 1U;
+  } else {
+    if (relay_test_mode != 0U) {
+      HAL_GPIO_WritePin(ANA_RELE_2_GPIO_Port, ANA_RELE_2_Pin, relay_test_prev_pd13 != 0U ? GPIO_PIN_SET : GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, relay_test_prev_pb15 != 0U ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    }
+
+    GPIO_InitStruct.Pin = CON_1_Pin|CON_2_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    relay_test_mode = 0U;
+  }
+}
+
+static void relay_test_drive(uint8_t value) {
+  if (relay_test_mode == 0U) {
+    return;
+  }
+
+  HAL_GPIO_WritePin(CON_1_Port, CON_1_Pin|CON_2_Pin, value != 0U ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
 static void stage_pins(struct netconn *conn) {
   if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
     uint8_t pe3 = (HAL_GPIO_ReadPin(BDU1_M_S_GPIO_Port, BDU1_M_S_Pin) == GPIO_PIN_SET) ? 1U : 0U;
@@ -364,6 +411,7 @@ static void stage_pins(struct netconn *conn) {
     length_html += sprintf((char*)(html + length_html), "\"pc9\":%u,", pc9);
 
     length_html += sprintf((char*)(html + length_html), "\"manual_mode\":%u,", manual_pins_mode);
+    length_html += sprintf((char*)(html + length_html), "\"relay_test_mode\":%u,", relay_test_mode);
     length_html += sprintf((char*)(html + length_html), "\"out_wdi\":%u,", out_wdi);
     length_html += sprintf((char*)(html + length_html), "\"out_uart1_re_de\":%u,", out_uart1_re_de);
     length_html += sprintf((char*)(html + length_html), "\"out_uart2_re_de\":%u,", out_uart2_re_de);
@@ -1179,6 +1227,10 @@ static void http_server(struct netconn *conn) {
                   bool has_pin_value = false;
                   bool has_manual_mode = false;
                   uint8_t manual_mode_value = 0U;
+                  bool has_relay_test_mode = false;
+                  uint8_t relay_test_mode_value = 0U;
+                  bool has_relay_test_drive = false;
+                  uint8_t relay_test_drive_value = 0U;
                   uint16_t pin_name_len = 0U;
 
                   memset(token, 0, sizeof(jsmntok_t) * TOK_LENGTH);
@@ -1191,6 +1243,16 @@ static void http_server(struct netconn *conn) {
                         memcpy((void *)tmp, (void *)(post_data.content + token[i + 1].start), token[i + 1].end - token[i + 1].start);
                         manual_mode_value = (atoi(tmp) != 0) ? 1U : 0U;
                         has_manual_mode = true;
+                      } else if (jsoneq(post_data.content, &token[i], "relay_test_mode") == 0) {
+                        memset((void *)tmp, 0, 16);
+                        memcpy((void *)tmp, (void *)(post_data.content + token[i + 1].start), token[i + 1].end - token[i + 1].start);
+                        relay_test_mode_value = (atoi(tmp) != 0) ? 1U : 0U;
+                        has_relay_test_mode = true;
+                      } else if (jsoneq(post_data.content, &token[i], "relay_test_drive") == 0) {
+                        memset((void *)tmp, 0, 16);
+                        memcpy((void *)tmp, (void *)(post_data.content + token[i + 1].start), token[i + 1].end - token[i + 1].start);
+                        relay_test_drive_value = (atoi(tmp) != 0) ? 1U : 0U;
+                        has_relay_test_drive = true;
                       } else if (jsoneq(post_data.content, &token[i], "pin") == 0) {
                         memset((void *)pin_name, 0, sizeof(pin_name));
                         pin_name_len = (uint16_t)(token[i + 1].end - token[i + 1].start);
@@ -1208,11 +1270,19 @@ static void http_server(struct netconn *conn) {
                       }
                     }
 
-                    if (has_manual_mode) {
+                    if (has_relay_test_mode) {
+                      relay_test_set_mode(relay_test_mode_value);
+                    }
+
+                    if (has_relay_test_drive) {
+                      relay_test_drive(relay_test_drive_value);
+                    }
+
+                    if (relay_test_mode == 0U && has_manual_mode) {
                       manual_pins_mode = manual_mode_value;
                     }
 
-                    if (manual_pins_mode != 0U && has_pin_name && has_pin_value) {
+                    if (relay_test_mode == 0U && manual_pins_mode != 0U && has_pin_name && has_pin_value) {
                       manual_pin_write_by_name(pin_name, pin_value);
                     }
                   }

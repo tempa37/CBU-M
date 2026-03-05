@@ -102,6 +102,28 @@ opacity: 1;
 .pin-btn.manual-active {
 cursor: pointer;
 }
+.relay-test-note {
+margin: 6px 0;
+padding: 8px;
+border: 1px solid #d8c585;
+background-color: #fff9de;
+font-size: 14px;
+}
+.relay-test-row {
+display: flex;
+align-items: center;
+gap: 12px;
+margin: 6px 0 8px;
+}
+.relay-test-status {
+font-weight: bold;
+color: #7d5f06;
+}
+#relay-test-run-btn:disabled {
+background-color: #9b9b9b;
+border-color: #888888;
+color: #f2f2f2;
+}
 </style>
 <title>Web конфигуратор</title>
 </head>
@@ -451,6 +473,17 @@ cursor: pointer;
 </tbody>
 </table>
 </div>
+<div class="elem0">
+<div class="left_col">&#1058;&#1077;&#1089;&#1090; &#1088;&#1077;&#1083;&#1077;</div>
+<div class="right_col"><button id="relay-test-toggle" type="button">&#1056;&#1072;&#1079;&#1074;&#1077;&#1088;&#1085;&#1091;&#1090;&#1100;</button></div>
+</div>
+<div id="relay-test-content" class="hide">
+<div id="relay-test-note" class="relay-test-note"></div>
+<div class="relay-test-row">
+<button id="relay-test-run-btn" type="button" class="pin-btn pin-off">&#1058;&#1077;&#1089;&#1090;</button>
+<span id="relay-test-status" class="relay-test-status"></span>
+</div>
+</div>
 <hr/>
 </div>
 
@@ -470,6 +503,9 @@ const TEXT_EXPAND = "\u0420\u0430\u0437\u0432\u0435\u0440\u043d\u0443\u0442\u044
 const TEXT_COLLAPSE = "\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c";
 const TEXT_ON = "\u0412\u043a\u043b";
 const TEXT_OFF = "\u0412\u044b\u043a\u043b";
+const TEXT_RELAY_TEST_BUTTON = "\u0422\u0435\u0441\u0442";
+const TEXT_RELAY_TEST_RUNNING = "\u0442\u0435\u0441\u0442 \u0438\u0434\u0435\u0442";
+const TEXT_RELAY_TEST_NOTE = "\u043f\u043e\u043a\u0430 \u043e\u0442\u043a\u0440\u044b\u0442 \u044d\u0442\u043e\u0442 \u0440\u0430\u0437\u0434\u0435\u043b, \u0444\u0443\u043d\u043a\u0446\u0438\u043e\u043d\u0430\u043b \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 \u043e\u0442\u043a\u043b\u044e\u0447\u0435\u043d";
 
 const manualPinsConfig = [
 	{ buttonId: "manual-pin-out_wdi", stateKey: "out_wdi", pinName: "wdi" },
@@ -491,6 +527,10 @@ let manualModeState = 0;
 let pendingManualMode = null;
 let pendingPinStates = {};
 let pendingTimers = {};
+let relaySectionActive = false;
+let relayModeReady = false;
+let relayTestInProgress = false;
+let relayTestTimer = null;
 
 function isSectionExpanded(contentId) {
 	let content = document.getElementById(contentId);
@@ -501,7 +541,7 @@ function hasPendingManualRequests() {
 	return pendingManualMode !== null || Object.keys(pendingPinStates).length > 0;
 }
 
-function initCollapsibleSection(toggleId, contentId) {
+function initCollapsibleSection(toggleId, contentId, onToggle) {
 	let toggle = document.getElementById(toggleId);
 	let content = document.getElementById(contentId);
 	if (toggle != null && content != null) {
@@ -509,17 +549,188 @@ function initCollapsibleSection(toggleId, contentId) {
 			content.classList.toggle("hide");
 			let isHidden = content.classList.contains("hide");
 			toggle.innerHTML = isHidden ? TEXT_EXPAND : TEXT_COLLAPSE;
-			updatePinsPollingState();
-			if (!isHidden) {
-				requestPinsState();
+			if (onToggle != null) {
+				onToggle(!isHidden);
 			}
 		});
 	}
 }
 
+function collapseSection(toggleId, contentId) {
+	let toggle = document.getElementById(toggleId);
+	let content = document.getElementById(contentId);
+	if (content != null) {
+		content.classList.add("hide");
+	}
+	if (toggle != null) {
+		toggle.innerHTML = TEXT_EXPAND;
+	}
+}
+
+function clearManualPendingRequests() {
+	clearPendingTimer("manual_mode");
+	pendingManualMode = null;
+	Object.keys(pendingPinStates).forEach(function(key) {
+		clearPendingTimer(key);
+		delete pendingPinStates[key];
+	});
+}
+
+function setRelayUiLock(locked) {
+	let controls = document.querySelectorAll("button, input, select, textarea");
+	controls.forEach(function(control) {
+		if (control == null || control.id === "relay-test-toggle" || control.id === "relay-test-run-btn") {
+			return;
+		}
+		if (locked) {
+			control.setAttribute("data-relay-prev-disabled", control.disabled ? "1" : "0");
+			control.disabled = true;
+		} else {
+			let prev = control.getAttribute("data-relay-prev-disabled");
+			if (prev != null) {
+				control.disabled = prev === "1";
+				control.removeAttribute("data-relay-prev-disabled");
+			}
+		}
+	});
+}
+
+function updateRelayTestControls() {
+	let runBtn = document.getElementById("relay-test-run-btn");
+	let status = document.getElementById("relay-test-status");
+	if (runBtn != null) {
+		runBtn.textContent = TEXT_RELAY_TEST_BUTTON;
+		runBtn.disabled = !relaySectionActive || !relayModeReady || relayTestInProgress;
+		runBtn.classList.remove("pin-on");
+		runBtn.classList.remove("pin-off");
+		runBtn.classList.remove("pin-pending");
+		runBtn.classList.remove("manual-active");
+		runBtn.classList.add(relayTestInProgress ? "pin-pending" : "pin-off");
+		if (!runBtn.disabled) {
+			runBtn.classList.add("manual-active");
+		}
+	}
+	if (status != null) {
+		status.textContent = relayTestInProgress ? TEXT_RELAY_TEST_RUNNING : "";
+	}
+}
+
+function setRelayTestSectionState(expanded) {
+	let content = document.getElementById("relay-test-content");
+	let toggle = document.getElementById("relay-test-toggle");
+	if (content != null) {
+		if (expanded) {
+			content.classList.remove("hide");
+		} else {
+			content.classList.add("hide");
+		}
+	}
+	if (toggle != null) {
+		toggle.innerHTML = expanded ? TEXT_COLLAPSE : TEXT_EXPAND;
+	}
+}
+
+function onRelayTestToggle(expanded) {
+	relaySectionActive = expanded;
+	if (expanded) {
+		relayModeReady = false;
+		relayTestInProgress = false;
+		if (relayTestTimer != null) {
+			clearTimeout(relayTestTimer);
+			relayTestTimer = null;
+		}
+		collapseSection("pins-toggle", "pins-content");
+		collapseSection("manual-pins-toggle", "manual-pins-content");
+		clearManualPendingRequests();
+		setRelayUiLock(true);
+		stopPinsPolling();
+		updateRelayTestControls();
+		renderManualControls();
+		sendManualPinsCommand({ relay_test_mode: 1 }, function() {
+			relayModeReady = true;
+			updateRelayTestControls();
+		}, function(status) {
+			relaySectionActive = false;
+			relayModeReady = false;
+			relayTestInProgress = false;
+			setRelayUiLock(false);
+			setRelayTestSectionState(false);
+			updateRelayTestControls();
+			renderManualControls();
+			updatePinsPollingState();
+			alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0440\u0435\u0436\u0438\u043c \u0442\u0435\u0441\u0442\u0430 \u0440\u0435\u043b\u0435" + (status > 0 ? " (HTTP " + status + ")" : ""));
+		});
+	} else {
+		if (relayTestTimer != null) {
+			clearTimeout(relayTestTimer);
+			relayTestTimer = null;
+			sendManualPinsCommand({ relay_test_drive: 1 }, null, null);
+		}
+		relayTestInProgress = false;
+		relayModeReady = false;
+		updateRelayTestControls();
+		sendManualPinsCommand({ relay_test_mode: 0 }, function() {
+			requestPinsState();
+		}, function(status) {
+			alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u044b\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0440\u0435\u0436\u0438\u043c \u0442\u0435\u0441\u0442\u0430 \u0440\u0435\u043b\u0435" + (status > 0 ? " (HTTP " + status + ")" : ""));
+		});
+		setRelayUiLock(false);
+		renderManualControls();
+		updatePinsPollingState();
+	}
+}
+
+function onRelayTestRunButtonClick() {
+	if (!relaySectionActive || !relayModeReady || relayTestInProgress) {
+		return;
+	}
+	relayTestInProgress = true;
+	updateRelayTestControls();
+	sendManualPinsCommand({ relay_test_drive: 0 }, function() {
+		relayTestTimer = setTimeout(function() {
+			relayTestTimer = null;
+			sendManualPinsCommand({ relay_test_drive: 1 }, function() {
+				relayTestInProgress = false;
+				updateRelayTestControls();
+			}, function(status) {
+				relayTestInProgress = false;
+				updateRelayTestControls();
+				alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c \u0442\u0435\u0441\u0442 \u0440\u0435\u043b\u0435" + (status > 0 ? " (HTTP " + status + ")" : ""));
+			});
+		}, 30000);
+	}, function(status) {
+		relayTestInProgress = false;
+		updateRelayTestControls();
+		alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c \u0442\u0435\u0441\u0442 \u0440\u0435\u043b\u0435" + (status > 0 ? " (HTTP " + status + ")" : ""));
+	});
+}
+
+function initRelayTestControls() {
+	let note = document.getElementById("relay-test-note");
+	if (note != null) {
+		note.textContent = TEXT_RELAY_TEST_NOTE;
+	}
+	let runBtn = document.getElementById("relay-test-run-btn");
+	if (runBtn != null) {
+		runBtn.addEventListener("click", onRelayTestRunButtonClick);
+	}
+	updateRelayTestControls();
+}
+
 function initPinStateToggle() {
-	initCollapsibleSection("pins-toggle", "pins-content");
-	initCollapsibleSection("manual-pins-toggle", "manual-pins-content");
+	initCollapsibleSection("pins-toggle", "pins-content", function(expanded) {
+		updatePinsPollingState();
+		if (expanded) {
+			requestPinsState();
+		}
+	});
+	initCollapsibleSection("manual-pins-toggle", "manual-pins-content", function(expanded) {
+		updatePinsPollingState();
+		if (expanded) {
+			requestPinsState();
+		}
+	});
+	initCollapsibleSection("relay-test-toggle", "relay-test-content", onRelayTestToggle);
 }
 
 function setPinValue(elementId, value) {
@@ -620,6 +831,9 @@ function renderPinsState(data) {
 }
 
 function requestPinsState() {
+	if (isSectionExpanded("relay-test-content")) {
+		return;
+	}
 	if (!isSectionExpanded("pins-content") && !isSectionExpanded("manual-pins-content") && !hasPendingManualRequests()) {
 		return;
 	}
@@ -658,6 +872,10 @@ function stopPinsPolling() {
 }
 
 function updatePinsPollingState() {
+	if (isSectionExpanded("relay-test-content")) {
+		stopPinsPolling();
+		return;
+	}
 	if (isSectionExpanded("pins-content") || isSectionExpanded("manual-pins-content") || hasPendingManualRequests()) {
 		startPinsPolling();
 	} else {
@@ -689,7 +907,7 @@ function sendManualPinsCommand(payload, onSuccess, onError) {
 }
 
 function onManualModeButtonClick() {
-	if (pendingManualMode !== null) {
+	if (pendingManualMode !== null || relaySectionActive) {
 		return;
 	}
 	let targetMode = manualModeState === 1 ? 0 : 1;
@@ -719,7 +937,7 @@ function onManualModeButtonClick() {
 }
 
 function onManualPinButtonClick(cfg) {
-	if (manualModeState !== 1 || pendingManualMode !== null) {
+	if (manualModeState !== 1 || pendingManualMode !== null || relaySectionActive) {
 		return;
 	}
 
@@ -796,6 +1014,7 @@ window.onload = function() {
 		uartBtn.addEventListener("click", StartUartTest);
 	}
 	initPinStateToggle();
+	initRelayTestControls();
 	initManualControls();
 	updatePinsPollingState();
 }
