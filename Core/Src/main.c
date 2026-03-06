@@ -199,9 +199,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   if (htim->Instance == TIM1) {
     HAL_IncTick();
   } else if (htim->Instance == TIM12) {
-    uint8_t ring_line_1 = (uint8_t)HAL_GPIO_ReadPin(CON_2_Port, CON_2_Pin);
-    uint8_t ring_line_2 = (uint8_t)HAL_GPIO_ReadPin(CON_1_Port, CON_1_Pin);
-    ring_line_capture_isr(ring_line_1, ring_line_2);
+    uint8_t opto_1_1 = (uint8_t)HAL_GPIO_ReadPin(MCU_BLK_1_1_GPIO_Port, MCU_BLK_1_1_Pin);
+    uint8_t opto_1_2 = (uint8_t)HAL_GPIO_ReadPin(MCU_BLK_1_2_GPIO_Port, MCU_BLK_1_2_Pin);
+    uint8_t opto_2_1 = (uint8_t)HAL_GPIO_ReadPin(MCU_BLK_2_1_GPIO_Port, MCU_BLK_2_1_Pin);
+    uint8_t opto_2_2 = (uint8_t)HAL_GPIO_ReadPin(MCU_BLK_2_2_GPIO_Port, MCU_BLK_2_2_Pin);
+    ring_line_capture_isr(opto_1_1, opto_1_2, opto_2_1, opto_2_2);
   }
 }
 

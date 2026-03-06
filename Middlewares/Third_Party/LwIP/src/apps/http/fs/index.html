@@ -434,10 +434,14 @@ color: #f2f2f2;
 <tr><td>PE4 (BDU2_M_S)</td><td>Вкл. БКК к.2</td><td id="pin-pe4" class="pin-value">-</td></tr>
 <tr><td>PD14 (CON_1)</td><td>Реле БКК 1: Лог0 - контур в порядке, Лог1 - контур ошибка</td><td id="pin-pd14" class="pin-value">-</td></tr>
 <tr><td>PD12 (CON_2)</td><td>Реле БКК 2: Лог0 - контур в порядке, Лог1 - контур ошибка</td><td id="pin-pd12" class="pin-value">-</td></tr>
-<tr><td>PC6 (MCU_BLK_1_1)</td><td>Оптрон 1.1 (пока не используем)</td><td id="pin-pc6" class="pin-value">-</td></tr>
-<tr><td>PD15 (MCU_BLK_1_2)</td><td>Оптрон 1.2 (пока не используем)</td><td id="pin-pd15" class="pin-value">-</td></tr>
-<tr><td>PD11 (MCU_BLK_2_1)</td><td>Оптрон 2.1 (пока не используем)</td><td id="pin-pd11" class="pin-value">-</td></tr>
-<tr><td>PD10 (MCU_BLK_2_2)</td><td>Оптрон 2.2 (пока не используем)</td><td id="pin-pd10" class="pin-value">-</td></tr>
+<tr><td>PC6 (MCU_BLK_1_1)</td><td>Optocoupler 1.1 (ring line analysis)</td><td id="pin-pc6" class="pin-value">-</td></tr>
+<tr><td>PD15 (MCU_BLK_1_2)</td><td>Optocoupler 1.2 (ring line analysis)</td><td id="pin-pd15" class="pin-value">-</td></tr>
+<tr><td>PD11 (MCU_BLK_2_1)</td><td>Optocoupler 2.1 (ring line analysis)</td><td id="pin-pd11" class="pin-value">-</td></tr>
+<tr><td>PD10 (MCU_BLK_2_2)</td><td>Optocoupler 2.2 (ring line analysis)</td><td id="pin-pd10" class="pin-value">-</td></tr>
+<tr><td>RING1</td><td>Contour 1 state (PC6 + PD15)</td><td id="pin-ring1-state" class="pin-value">-</td></tr>
+<tr><td>RING1 CNT</td><td>Contour 1 counts (PC6/PD15)</td><td id="pin-ring1-count" class="pin-value">-</td></tr>
+<tr><td>RING2</td><td>Contour 2 state (PD11 + PD10)</td><td id="pin-ring2-state" class="pin-value">-</td></tr>
+<tr><td>RING2 CNT</td><td>Contour 2 counts (PD11/PD10)</td><td id="pin-ring2-count" class="pin-value">-</td></tr>
 <tr><td>PD8 (CON_ON_OFF)</td><td>Ошибка связи: Лог0 - норма (SB4.1 и STM_LOOP_LINK одинаково), Лог1 - норма (SB4.1 и STM_LOOP_LINK рассогласованы)</td><td id="pin-pd8" class="pin-value">-</td></tr>
 <tr><td>PA15 (RS485_1_ON)</td><td>ПИРС 1: Лог1 - ПИРС на связи, Лог0 - связи нет</td><td id="pin-pa15" class="pin-value">-</td></tr>
 <tr><td>PC9 (RS485_2_ON)</td><td>ПИРС 2: Лог1 - ПИРС на связи, Лог0 - связи нет</td><td id="pin-pc9" class="pin-value">-</td></tr>
@@ -740,6 +744,20 @@ function setPinValue(elementId, value) {
 	}
 }
 
+function ringLineStateToText(value) {
+    let state = Number(value);
+    if (state === 0) {
+        return "SHORT";
+    }
+    if (state === 1) {
+        return "BREAK";
+    }
+    if (state === 2) {
+        return "DIODE";
+    }
+    return "UNDEF";
+}
+
 function setButtonState(button, value, enabled, pending, isModeButton) {
 	if (button == null) {
 		return;
@@ -809,6 +827,12 @@ function renderPinsState(data) {
 	setPinValue("pin-pd8", data.pd8);
 	setPinValue("pin-pa15", data.pa15);
 	setPinValue("pin-pc9", data.pc9);
+    let ring1Count = (data.ring1_opto11_count !== undefined && data.ring1_opto12_count !== undefined) ? (data.ring1_opto11_count + "/" + data.ring1_opto12_count) : "-";
+    let ring2Count = (data.ring2_opto21_count !== undefined && data.ring2_opto22_count !== undefined) ? (data.ring2_opto21_count + "/" + data.ring2_opto22_count) : "-";
+    setPinValue("pin-ring1-state", ringLineStateToText(data.ring1_state));
+    setPinValue("pin-ring1-count", ring1Count);
+    setPinValue("pin-ring2-state", ringLineStateToText(data.ring2_state));
+    setPinValue("pin-ring2-count", ring2Count);
 
 	if (pendingManualMode !== null && manualModeState === pendingManualMode) {
 		clearPendingTimer("manual_mode");

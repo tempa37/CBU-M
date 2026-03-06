@@ -13,6 +13,7 @@
 #include "tcp.h"
 #include "global_types.h"
 #include "manage_settings.h"
+#include "ring_line.h"
 #include "main.h"
 
 
@@ -394,6 +395,12 @@ static void stage_pins(struct netconn *conn) {
     uint8_t out_oled_cs = (HAL_GPIO_ReadPin(OLED_CS_GPIO_Port, OLED_CS_Pin) == GPIO_PIN_SET) ? 1U : 0U;
     uint8_t out_oled_rst = (HAL_GPIO_ReadPin(OLED_RST_GPIO_Port, OLED_RST_Pin) == GPIO_PIN_SET) ? 1U : 0U;
     uint8_t out_pb15 = manual_pin_read_pb15();
+    uint8_t ring1_state = (uint8_t)g_ring_line_state;
+    uint8_t ring2_state = (uint8_t)g_ring_line_state_2;
+    uint16_t ring1_opto11_count = g_ring_line_opto_1_1_count;
+    uint16_t ring1_opto12_count = g_ring_line_opto_1_2_count;
+    uint16_t ring2_opto21_count = g_ring_line_opto_2_1_count;
+    uint16_t ring2_opto22_count = g_ring_line_opto_2_2_count;
 
     memset(html, 0, HTML_LEN);
     length_html = 0;
@@ -422,7 +429,13 @@ static void stage_pins(struct netconn *conn) {
     length_html += sprintf((char*)(html + length_html), "\"out_oled_dc\":%u,", out_oled_dc);
     length_html += sprintf((char*)(html + length_html), "\"out_oled_cs\":%u,", out_oled_cs);
     length_html += sprintf((char*)(html + length_html), "\"out_oled_rst\":%u,", out_oled_rst);
-    length_html += sprintf((char*)(html + length_html), "\"out_pb15\":%u}", out_pb15);
+    length_html += sprintf((char*)(html + length_html), "\"out_pb15\":%u,", out_pb15);
+    length_html += sprintf((char*)(html + length_html), "\"ring1_state\":%u,", ring1_state);
+    length_html += sprintf((char*)(html + length_html), "\"ring2_state\":%u,", ring2_state);
+    length_html += sprintf((char*)(html + length_html), "\"ring1_opto11_count\":%u,", ring1_opto11_count);
+    length_html += sprintf((char*)(html + length_html), "\"ring1_opto12_count\":%u,", ring1_opto12_count);
+    length_html += sprintf((char*)(html + length_html), "\"ring2_opto21_count\":%u,", ring2_opto21_count);
+    length_html += sprintf((char*)(html + length_html), "\"ring2_opto22_count\":%u}", ring2_opto22_count);
 
     send_response(conn);
 

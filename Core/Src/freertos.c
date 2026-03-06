@@ -989,6 +989,6 @@ static void ring_line_thread(void *argument) {
 
   while (1) {
     ring_line_process_task_step();
-    osDelay(500);
+    osDelay(20);
   }
 }
