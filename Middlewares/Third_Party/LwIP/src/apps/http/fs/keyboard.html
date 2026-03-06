@@ -175,6 +175,9 @@ function bindLocalInteraction() {
     };
 
     el.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse') {
+        return;
+      }
       event.preventDefault();
       pressedHistoryBits.add(bit);
       manualMask |= (1 << bit);
