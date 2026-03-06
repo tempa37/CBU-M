@@ -53,6 +53,11 @@
   * @{
   */
     
+static int32_t LAN8710_IsValidRegValue(uint32_t value)
+{
+  return ((value != 0x0000U) && (value != 0xFFFFU));
+}
+
 /**
   * @brief  Register IO functions to component object
   * @param  pObj: device object  of LAN8710_Object_t. 
@@ -90,6 +95,7 @@ int32_t LAN8710_RegisterBusIO(lan8710_Object_t *pObj, lan8710_IOCtx_t *ioctx)
    //pObj->DevAddr = 7;  
    
    uint32_t tickstart = 0, regvalue = 0, addr = 0;
+   uint32_t phyid1 = 0, phyid2 = 0;
 
    int32_t status = LAN8710_STATUS_OK;
 
@@ -114,7 +120,29 @@ int32_t LAN8710_RegisterBusIO(lan8710_Object_t *pObj, lan8710_IOCtx_t *ioctx)
          //   continue with next address
          continue;
        }
-     
+
+       // Ignore floating MDIO reads from non-existent PHY addresses.
+       if(LAN8710_IsValidRegValue(regvalue) == 0)
+       {
+         continue;
+       }
+
+       if((regvalue & LAN8710_SMR_PHY_ADDR) != addr)
+       {
+         continue;
+       }
+
+       if((pObj->IO.ReadReg(addr, LAN8710_PHYI1R, &phyid1) < 0) ||
+          (pObj->IO.ReadReg(addr, LAN8710_PHYI2R, &phyid2) < 0))
+       {
+         continue;
+       }
+
+       if((LAN8710_IsValidRegValue(phyid1) == 0) || (LAN8710_IsValidRegValue(phyid2) == 0))
+       {
+         continue;
+       }
+
        if((regvalue & LAN8710_SMR_PHY_ADDR) == addr)
        {
          pObj->DevAddr = addr;
@@ -175,7 +203,23 @@ int32_t LAN8710_RegisterBusIO(lan8710_Object_t *pObj, lan8710_IOCtx_t *ioctx)
    
    //pObj->IO.WriteReg(pObj->DevAddr, LAN8710_SMR, regvalue);
    
-   pObj->IO.WriteReg(pObj->DevAddr, LAN8710_BCR, LAN8710_BCR_AUTONEGO_EN);
+   if(status == LAN8710_STATUS_OK)
+   {
+     if(pObj->IO.ReadReg(pObj->DevAddr, LAN8710_BCR, &regvalue) < 0)
+     {
+       status = LAN8710_STATUS_READ_ERROR;
+     }
+     else
+     {
+       regvalue &= ~(LAN8710_BCR_POWER_DOWN | LAN8710_BCR_ISOLATE);
+       regvalue |= (LAN8710_BCR_AUTONEGO_EN | LAN8710_BCR_RESTART_AUTONEGO);
+
+       if(pObj->IO.WriteReg(pObj->DevAddr, LAN8710_BCR, regvalue) < 0)
+       {
+         status = LAN8710_STATUS_WRITE_ERROR;
+       }
+     }
+   }
    
    if(status == LAN8710_STATUS_OK)
    {     
@@ -290,7 +334,8 @@ int32_t LAN8710_StartAutoNego(lan8710_Object_t *pObj)
   
   if(pObj->IO.ReadReg(pObj->DevAddr, LAN8710_BCR, &readval) >= 0)
   {
-    readval |= LAN8710_BCR_RESTART_AUTONEGO;
+    readval &= ~(LAN8710_BCR_POWER_DOWN | LAN8710_BCR_ISOLATE);
+    readval |= (LAN8710_BCR_AUTONEGO_EN | LAN8710_BCR_RESTART_AUTONEGO);
   
     /* Apply configuration */
     if(pObj->IO.WriteReg(pObj->DevAddr, LAN8710_BCR, readval) < 0)
@@ -328,13 +373,11 @@ int32_t LAN8710_GetLinkState(lan8710_Object_t *pObj)
   {
     return LAN8710_STATUS_READ_ERROR;
   }
-/*  
-  // Read Status register again
+  // Read Status register again (latched low bit)
   if(pObj->IO.ReadReg(pObj->DevAddr, LAN8710_BSR, &readval) < 0)
   {
     return LAN8710_STATUS_READ_ERROR;
   }
-*/
   
   if((readval & LAN8710_BSR_LINK_STATUS) == 0)
   {

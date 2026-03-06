@@ -51,7 +51,11 @@
 #define ETH_DMA_TRANSMIT_TIMEOUT               ( 20U )
 #define ETH_TX_BUFFER_MAX             ((ETH_TX_DESC_CNT) * 2U)
 #define ETH_TX_SEMAPHORE_TIMEOUT_MS            ( 1000U )
-
+#define ETH_PHY_RESET_ASSERT_MS                ( 50U )
+#define ETH_PHY_RESET_RELEASE_MS               ( 200U )
+#define ETH_PHY_INIT_RETRY_COUNT               ( 2U )
+#define ETH_PHY_STARTUP_RECOVERY_COUNT         ( 2U )
+#define ETH_PHY_STARTUP_RECOVERY_INTERVAL_MS   ( 2500U )
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
@@ -119,7 +123,9 @@ int32_t ETH_PHY_IO_DeInit (void);
 int32_t ETH_PHY_IO_ReadReg(uint32_t DevAddr, uint32_t RegAddr, uint32_t *pRegVal);
 int32_t ETH_PHY_IO_WriteReg(uint32_t DevAddr, uint32_t RegAddr, uint32_t RegVal);
 int32_t ETH_PHY_IO_GetTick(void);
-
+static void ETH_PHY_HardReset(void);
+static int32_t ETH_PHY_InitWithRetry(uint32_t attempts);
+static int32_t ETH_PHY_ModeMatchesMAC(void);
 lan8710_Object_t LAN8710;
 lan8710_IOCtx_t  LAN8710_IOCtx = {ETH_PHY_IO_Init,
                                ETH_PHY_IO_DeInit,
@@ -173,6 +179,62 @@ void HAL_ETH_ErrorCallback(ETH_HandleTypeDef *handlerEth)
 /* USER CODE BEGIN 4 */
 
 extern uint8_t MACAddr[];
+
+static void ETH_PHY_HardReset(void)
+{
+  HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_RESET);
+  HAL_Delay(ETH_PHY_RESET_ASSERT_MS);
+  HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_SET);
+  HAL_Delay(ETH_PHY_RESET_RELEASE_MS);
+}
+
+static int32_t ETH_PHY_ModeMatchesMAC(void)
+{
+  uint32_t smr = 0U;
+
+  if (ETH_PHY_IO_ReadReg(LAN8710.DevAddr, LAN8710_SMR, &smr) < 0)
+  {
+    return 0;
+  }
+
+  if (heth.Init.MediaInterface == HAL_ETH_MII_MODE)
+  {
+    return ((smr & LAN8710_SMR_MIIMODE) == LAN8710_SMR_MIIMODE);
+  }
+
+  return ((smr & LAN8710_SMR_MIIMODE) == 0U);
+}
+
+static int32_t ETH_PHY_InitWithRetry(uint32_t attempts)
+{
+  uint32_t attempt = 0U;
+
+  for (attempt = 0U; attempt < attempts; attempt++)
+  {
+    ETH_PHY_HardReset();
+    LAN8710.Is_Initialized = 0U;
+
+    if (LAN8710_RegisterBusIO(&LAN8710, &LAN8710_IOCtx) != 0)
+    {
+      continue;
+    }
+
+    if (LAN8710_Init(&LAN8710) != LAN8710_STATUS_OK)
+    {
+      continue;
+    }
+
+    if (ETH_PHY_ModeMatchesMAC() == 0)
+    {
+      continue;
+    }
+
+    (void)LAN8710_StartAutoNego(&LAN8710);
+    return LAN8710_STATUS_OK;
+  }
+
+  return LAN8710_STATUS_ERROR;
+}
 
 /* USER CODE END 4 */
 
@@ -273,13 +335,8 @@ static void low_level_init(struct netif *netif)
 /* USER CODE BEGIN PHY_PRE_CONFIG */
 
 /* USER CODE END PHY_PRE_CONFIG */
-  /* Set PHY IO functions */
-  if (LAN8710_RegisterBusIO(&LAN8710, &LAN8710_IOCtx) != 0)
-  {
-    Error_Handler();
-  }
-  /* Initialize the DP83848 ETH PHY */
-  if (LAN8710_Init(&LAN8710) != 0)
+  /* Set PHY IO functions + initialize PHY with retries */
+  if (ETH_PHY_InitWithRetry(ETH_PHY_INIT_RETRY_COUNT) != LAN8710_STATUS_OK)
   {
     Error_Handler();
   }
@@ -814,6 +871,9 @@ void ethernet_link_thread(void* argument)
   ETH_MACConfigTypeDef MACConf = {0};
   int32_t PHYLinkState = 0;
   uint32_t linkchanged = 0U, speed = 0U, duplex = 0U;
+  uint8_t link_ever_up = 0U;
+  uint32_t startup_recovery_count = 0U;
+  uint32_t startup_recovery_tick = 0U;
   
   struct netif *netif = (struct netif *) argument;
   /* USER CODE BEGIN ETH link init */
@@ -822,6 +882,9 @@ void ethernet_link_thread(void* argument)
   
   for(;;)
   {
+    linkchanged = 0U;
+    speed = 0U;
+    duplex = 0U;
 #ifdef DEBUG
     HighWaterMarkETH = uxTaskGetStackHighWaterMark(NULL);
     //linkupp++;
@@ -880,6 +943,26 @@ void ethernet_link_thread(void* argument)
         HAL_ETH_Start_IT(&heth);
         netif_set_up(netif);
         netif_set_link_up(netif);
+        link_ever_up = 1U;
+      }
+    }
+
+    if((link_ever_up == 0U) &&
+       (PHYLinkState <= LAN8710_STATUS_LINK_DOWN) &&
+       (startup_recovery_count < ETH_PHY_STARTUP_RECOVERY_COUNT))
+    {
+      uint32_t now = HAL_GetTick();
+
+      if((now - startup_recovery_tick) >= ETH_PHY_STARTUP_RECOVERY_INTERVAL_MS)
+      {
+        HAL_ETH_Stop_IT(&heth);
+        netif_set_down(netif);
+        netif_set_link_down(netif);
+
+        (void)ETH_PHY_InitWithRetry(1U);
+
+        startup_recovery_count++;
+        startup_recovery_tick = now;
       }
     }
     
