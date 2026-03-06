@@ -997,10 +997,15 @@ static void http_server(struct netconn *conn) {
             netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_NOCOPY);
             fs_close(&file);
           }
-          else if (strncmp(buf, "GET /keyboard.html", 18) == 0) {
-            fs_open(&file, "/keyboard.html");
-            netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_NOCOPY);
-            fs_close(&file);
+          else if ((strncmp(buf, "GET /keyboard.html", 18) == 0) || (strncmp(buf, "GET /\\keyboard.html", 19) == 0)) {
+            if (fs_open(&file, "/keyboard.html") == ERR_OK) {
+              netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_NOCOPY);
+              fs_close(&file);
+            } else {
+              fs_open(&file, "/404.html");
+              netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_COPY);
+              fs_close(&file);
+            }
           }
           else if (strncmp(buf, "GET /ota.html", 13) == 0) {
             fs_open(&file, "/ota.html");
