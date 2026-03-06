@@ -15,7 +15,7 @@
 #include "manage_settings.h"
 #include "ring_line.h"
 #include "main.h"
-
+#include "keyboard.h"
 
 // for function mktime() & difftime()
 //#include <time.h>
@@ -31,6 +31,7 @@ static void fwupdate_send_success(struct netconn* conn, const char* str);
 static int jsoneq(const char *json, jsmntok_t *tok, const char *s);
 static void stage_set(struct netconn *conn, uint8_t config);
 static void stage_pins(struct netconn *conn);
+static void stage_keyboard_state(struct netconn *conn);
 static void manual_pin_write_by_name(const char *pin_name, uint8_t value);
 static uint8_t manual_pin_read_pb15(void);
 static void relay_test_set_mode(uint8_t enable);
@@ -442,6 +443,19 @@ static void stage_pins(struct netconn *conn) {
     osSemaphoreRelease(httpdbufSemaphore);
   }
 }
+static void stage_keyboard_state(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    uint16_t keyboard_mask = keyboard_get_web_mask();
+
+    memset(html, 0, HTML_LEN);
+    length_html = sprintf((char*)(html), "{\"m\":\"%04X\"}", keyboard_mask);
+
+    send_response(conn);
+
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
 void stage_set(struct netconn *conn, uint8_t config) {
   if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
     memset(html, 0, HTML_LEN);
@@ -969,6 +983,9 @@ static void http_server(struct netconn *conn) {
           else if (strncmp(buf, "GET /pins.json", 14) == 0) {
             stage_pins(conn);
           }
+          else if (strncmp(buf, "GET /keyboard_state.json", 24) == 0) {
+            stage_keyboard_state(conn);
+          }
           else if (strncmp(buf, "GET /uart_test_start", 20) == 0) {
             uart_test_start(conn);
           }
@@ -977,6 +994,11 @@ static void http_server(struct netconn *conn) {
           }
           else if (strncmp(buf, "GET /info.html", 14) == 0) {
             fs_open(&file, "/info.html");
+            netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_NOCOPY);
+            fs_close(&file);
+          }
+          else if (strncmp(buf, "GET /keyboard.html", 18) == 0) {
+            fs_open(&file, "/keyboard.html");
             netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_NOCOPY);
             fs_close(&file);
           }

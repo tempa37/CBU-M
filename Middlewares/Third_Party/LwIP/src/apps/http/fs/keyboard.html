@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <link rel="icon" href="data:;base64,iVBORw0KGgo=">
@@ -70,7 +70,7 @@ button { padding: 8px 14px; font-size: 16px; cursor: pointer; }
 </head>
 <body>
 <div class="topbar">
-  <button type="button" onclick="location.href='test.html'">&larr; Назад</button>
+  <button type="button" onclick="location.href='index.html'">&larr; Назад</button>
   <h2>Тест клавиатуры</h2>
   <div class="status" id="status">mask: ----</div>
 </div>
@@ -88,10 +88,10 @@ button { padding: 8px 14px; font-size: 16px; cursor: pointer; }
     <div class="key" id="k_cancel" style="left:590px; top:178px;">&#10005;</div>
 
     <div class="key-title" style="left:90px; top:350px;">Увеличить давление</div>
-    <div class="key" id="k_start1" style="left:120px; top:405px;"></div>
+    <div class="key" id="k_start" style="left:120px; top:405px;"></div>
 
     <div class="key-title" style="left:300px; top:350px;">Уменьшить давление</div>
-    <div class="key" id="k_stop1" style="left:330px; top:405px;"></div>
+    <div class="key" id="k_stop" style="left:330px; top:405px;"></div>
 
     <div class="key large" id="k_emergency" style="left:530px; top:382px;">
     STOP
@@ -106,8 +106,8 @@ const KEY_BINDINGS = [
   { bit: 2, id: 'k_down' },
   { bit: 3, id: 'k_left' },
   { bit: 4, id: 'k_cancel' },
-  { bit: 9, id: 'k_start1' },
-  { bit: 11, id: 'k_stop1' },
+  { bit: 9, id: 'k_start' },
+  { bit: 11, id: 'k_stop' },
   { bit: 12, id: 'k_apply' },
   { bit: 13, id: 'k_emergency' }
 ];
@@ -118,8 +118,8 @@ const STM_KEY_NAMES = {
   2: 'key_down',
   3: 'key_left',
   4: 'key_cancel',
-  9: 'key_start1',
-  11: 'key_stop1',
+  9: 'key_start',
+  11: 'key_stop',
   12: 'key_apply',
   13: 'key_emergency_stop'
 };
@@ -219,5 +219,3 @@ pollKeyboardState();
 </script>
 </body>
 </html>
-
-

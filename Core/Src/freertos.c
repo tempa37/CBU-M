@@ -369,15 +369,17 @@ static void startDefaultTask(void *argument) {
             break;
           }
           case KEY_ID_RIGHT : {
-            //if (CurrentMenuItem->Child == &Me_1_1_2 || CurrentMenuItem->Child == &Me_1_2_2) {
-            //  Menu_EnterCurrentItem(1);
-            //}
+            if (click == 1) {
+              Menu_EnterCurrentItem(1);
+              click = 0;
+            }
             break;
           }
           case KEY_ID_LEFT : {
-            //if (CurrentMenuItem->Child == &Me_1_1_2 || CurrentMenuItem->Child == &Me_1_2_2) {
-            //  Menu_EnterCurrentItem(0);
-            //}
+            if (click == 1) {
+              Menu_EnterCurrentItem(0);
+              click = 0;
+            }
             break;
           }
           case KEY_ID_INPUT : {
