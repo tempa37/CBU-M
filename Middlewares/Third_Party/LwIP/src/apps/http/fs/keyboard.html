@@ -28,34 +28,13 @@ body { width:1280px; margin:auto; font-family: Arial, sans-serif; }
   align-items: center;
   justify-content: center;
   user-select: none;
+  touch-action: none;
   transition: background-color .08s ease, border-color .08s ease;
 }
 .key.large { width: 170px; height: 170px; }
 .key.active { background: #42b15d; border-color: #2f8d45; color: #fff; }
 .key.pressed-history { background: #dff1ff; border-color: #9ec8ea; }
-.key.pressed-history-striped {
-  background: repeating-linear-gradient(
-    -45deg,
-    #dff1ff 0 10px,
-    #dff1ff 10px 20px,
-    #ffffff 20px 30px,
-    #ffffff 30px 40px
-  );
-  border-color: #9ec8ea;
-}
-.key.active.pressed-history,
-.key.active.pressed-history-striped { background: #42b15d; border-color: #2f8d45; color: #fff; }
-.knob-line {
-  width: 2px;
-  height: 46px;
-  background: #303030;
-  border-radius: 2px;
-  transform-origin: center center;
-  transition: transform .08s ease;
-}
-.knob-left .knob-line { transform: rotate(-45deg); }
-.knob-right .knob-line { transform: rotate(45deg); }
-.knob-center .knob-line { transform: rotate(0deg); }
+.key.active.pressed-history { background: #42b15d; border-color: #2f8d45; color: #fff; }
 .topbar { display:flex; justify-content:space-between; align-items:center; margin: 18px 40px 0; }
 button { padding: 8px 14px; font-size: 16px; cursor: pointer; }
 .status { font-family: monospace; }
@@ -68,107 +47,51 @@ button { padding: 8px 14px; font-size: 16px; cursor: pointer; }
   font-weight: 600;
   user-select: none;
 }
-.revision-group { display: none; }
-.revision-group.active { display: block; }
-.revision-toggle-wrap { display: flex; justify-content: center; margin-bottom: 25px; }
 </style>
 </head>
 <body>
 <div class="topbar">
-  <button type="button" onclick="location.href='test.html'">← Назад</button>
+  <button type="button" onclick="location.href='test.html'">&larr; Назад</button>
   <h2>Тест клавиатуры</h2>
   <div class="status" id="status">mask: ----</div>
 </div>
 
 <div class="panel" id="keyboard_panel">
-  <div class="key-title" style="left:11px; top:90px;">ОТМЕНИТЬ</div>
-  <div class="key" id="k14" style="left:30px; top:130px;"></div>
+  <div class="key" id="k_left" style="left:455px; top:38px;">&#9664;</div>
+  <div class="key" id="k_up" style="left:560px; top:38px;">&#9650;</div>
+  <div class="key" id="k_right" style="left:665px; top:38px;">&#9654;</div>
 
-  <div class="key-title" id="k15_title" style="left:11px; top:450px;">МЕСТНЫЙ</div>
-  <div class="key knob knob-center" id="k15" style="left:30px; top:490px;">
-    <span class="knob-line" id="k15_line"></span>
-  </div>
+  <div class="key" id="k_apply" style="left:455px; top:168px;">&#10003;</div>
+  <div class="key-title" style="left:436px; top:278px;">ПРИМЕНИТЬ</div>
 
-  <div class="key" id="k1" style="left:495px; top:40px;">↑</div>
-  <div class="key" id="k3" style="left:410px; top:140px;">←</div>
-  <div class="key" id="k0" style="left:580px; top:140px;">→</div>
-  <div class="key" id="k2" style="left:495px; top:240px;">↓</div>
+  <div class="key-title" style="left:541px; top:128px;">МЕНЮ</div>
+  <div class="key" id="k_down" style="left:560px; top:168px;">&#9660;</div>
 
-  <div class="key-title" style="left:951px; top:90px;">ПРИМЕНИТЬ</div>
-  <div class="key" id="k4" style="left:970px; top:130px;"></div>
+  <div class="key" id="k_cancel" style="left:665px; top:168px;">&#10005;</div>
+  <div class="key-title" style="left:646px; top:278px;">ОТМЕНИТЬ</div>
 
-  <div id="rev1_group" class="revision-group active">
-    <div class="key-title" style="left:336px; top:450px;">ПУСК</div>
-    <div class="key" id="k12_rev1" style="left:355px; top:490px;"></div>
+  <div class="key-title" style="left:70px; top:390px; width:160px;">УВЕЛИЧИТЬ ДАВЛЕНИЕ</div>
+  <div class="key" id="k_inc" style="left:90px; top:430px;"></div>
 
-    <div class="key-title" style="left:476px; top:450px;">СТОП</div>
-    <div class="key" id="k9_rev1" style="left:495px; top:490px;"></div>
+  <div class="key-title" style="left:280px; top:390px; width:160px;">УМЕНЬШИТЬ ДАВЛЕНИЕ</div>
+  <div class="key" id="k_dec" style="left:300px; top:430px;"></div>
 
-    <div class="key-title" style="left:616px; top:450px;">КВИТИР</div>
-    <div class="key" id="k8_rev1" style="left:635px; top:490px;"></div>
-  </div>
-
-  <div id="rev2_group" class="revision-group">
-    <div class="key-title" style="left:285px; top:360px;">ПУСК 1</div>
-    <div class="key" id="k12_rev2" style="left:304px; top:400px;"></div>
-
-    <div class="key-title" style="left:455px; top:360px;">ПУСК 2</div>
-    <div class="key" id="k5_rev2" style="left:474px; top:400px;"></div>
-
-    <div class="key-title" style="left:625px; top:360px;">ПУСК 3</div>
-    <div class="key" id="k7_rev2" style="left:644px; top:400px;"></div>
-
-    <div class="key-title" style="left:795px; top:360px;">КВИТИР.</div>
-    <div class="key" id="k8_rev2" style="left:814px; top:400px;"></div>
-
-    <div class="key" id="k9_rev2" style="left:304px; top:540px;"></div>
-    <div class="key-title" style="left:285px; top:650px;">СТОП 1</div>
-
-    <div class="key" id="k10_rev2" style="left:474px; top:540px;"></div>
-    <div class="key-title" style="left:455px; top:650px;">СТОП 2</div>
-
-    <div class="key" id="k11_rev2" style="left:644px; top:540px;"></div>
-    <div class="key-title" style="left:625px; top:650px;">СТОП 3</div>
-  </div>
-
-  <div class="key large" id="k13" style="left:935px; top:430px;">STOP</div>
-</div>
-
-<div class="revision-toggle-wrap">
-  <button type="button" id="revision_toggle_btn">У меня другая ревизия устройства</button>
+  <div class="key-title" style="left:805px; top:360px;">АВАРИЙНЫЙ</div>
+  <div class="key large" id="k_emergency" style="left:800px; top:400px;">STOP</div>
 </div>
 
 <script>
-const REVISION_MAPS = {
-  1: [
-    { bit: 0, id: 'k0' },
-    { bit: 1, id: 'k1' },
-    { bit: 2, id: 'k2' },
-    { bit: 3, id: 'k3' },
-    { bit: 4, id: 'k14' },
-    { bit: 6, id: 'k8_rev1' },
-    { bit: 9, id: 'k12_rev1' },
-    { bit: 11, id: 'k9_rev1' },
-    { bit: 12, id: 'k4' },
-    { bit: 13, id: 'k13' }
-  ],
-  2: [
-    { bit: 0, id: 'k0' },
-    { bit: 1, id: 'k1' },
-    { bit: 2, id: 'k2' },
-    { bit: 3, id: 'k3' },
-    { bit: 4, id: 'k14' },
-    { bit: 5, id: 'k5_rev2' },
-    { bit: 6, id: 'k8_rev2' },
-    { bit: 7, id: 'k7_rev2' },
-    { bit: 8, id: 'k11_rev2' },
-    { bit: 9, id: 'k12_rev2' },
-    { bit: 10, id: 'k10_rev2' },
-    { bit: 11, id: 'k9_rev2' },
-    { bit: 12, id: 'k4' },
-    { bit: 13, id: 'k13' }
-  ]
-};
+const KEY_BINDINGS = [
+  { bit: 0, id: 'k_right' },
+  { bit: 1, id: 'k_up' },
+  { bit: 2, id: 'k_down' },
+  { bit: 3, id: 'k_left' },
+  { bit: 4, id: 'k_cancel' },
+  { bit: 9, id: 'k_inc' },
+  { bit: 11, id: 'k_dec' },
+  { bit: 12, id: 'k_apply' },
+  { bit: 13, id: 'k_emergency' }
+];
 
 const STM_KEY_NAMES = {
   0: 'key_right',
@@ -176,55 +99,22 @@ const STM_KEY_NAMES = {
   2: 'key_down',
   3: 'key_left',
   4: 'key_cancel',
-  5: 'key_start2',
-  6: 'key_ack',
-  7: 'key_start3',
-  8: 'key_stop3',
-  9: 'key_start1',
-  10: 'key_stop2',
-  11: 'key_stop1',
+  9: 'key_increase',
+  11: 'key_decrease',
   12: 'key_apply',
-  13: 'key_emergency_stop',
-  14: 'key_distance',
-  15: 'key_repair'
+  13: 'key_emergency_stop'
 };
 
-const k15Knob = document.getElementById('k15');
-const k15Title = document.getElementById('k15_title');
-const revisionToggleBtn = document.getElementById('revision_toggle_btn');
-const revisionGroups = {
-  1: document.getElementById('rev1_group'),
-  2: document.getElementById('rev2_group')
-};
+const keysByBit = new Map(
+  KEY_BINDINGS.map((binding) => [binding.bit, document.getElementById(binding.id)])
+);
 
-let currentRevision = 1;
-let prevMask = -1;
+const statusEl = document.getElementById('status');
 const pressedHistoryBits = new Set();
-
-function getActiveKeyMap() {
-  return REVISION_MAPS[currentRevision] || REVISION_MAPS[1];
-}
-
-function getKeysByBit() {
-  return new Map(getActiveKeyMap().map((x) => [x.bit, document.getElementById(x.id)]));
-}
-
-function clearAllKeyStates() {
-  document.querySelectorAll('.key').forEach((el) => {
-    el.classList.remove('active', 'pressed-history', 'pressed-history-striped');
-  });
-}
-
-function switchRevision() {
-  currentRevision = currentRevision === 1 ? 2 : 1;
-  revisionGroups[1].classList.toggle('active', currentRevision === 1);
-  revisionGroups[2].classList.toggle('active', currentRevision === 2);
-  clearAllKeyStates();
-  renderMask(prevMask < 0 ? 0 : prevMask);
-  console.log(`[STM] Переключена ревизия клавиатуры: rev${currentRevision}`);
-}
-
-revisionToggleBtn.addEventListener('click', switchRevision);
+let hwMask = 0;
+let manualMask = 0;
+let pollInFlight = false;
+let pollTimer = null;
 
 function logPressedKeys(previousMask, mask) {
   const pressedMask = mask & (~previousMask);
@@ -236,14 +126,12 @@ function logPressedKeys(previousMask, mask) {
     if (((pressedMask >> bit) & 1) === 1) {
       pressedHistoryBits.add(bit);
       const keyName = STM_KEY_NAMES[bit] || `bit_${bit}`;
-      console.log(`[STM] Нажата кнопка: ${keyName} (bit ${bit})`);
+      console.log(`[STM] key pressed: ${keyName} (bit ${bit})`);
     }
   }
 }
 
 function renderMask(mask) {
-  const keysByBit = getKeysByBit();
-
   for (const [bit, el] of keysByBit) {
     if (!el) continue;
     const active = ((mask >> bit) & 1) === 1;
@@ -251,37 +139,37 @@ function renderMask(mask) {
     el.classList.toggle('pressed-history', pressedHistoryBits.has(bit));
   }
 
-  const leftActive = ((mask >> 14) & 1) === 1;
-  const rightActive = ((mask >> 15) & 1) === 1;
-  if (k15Knob) {
-    const leftHistory = pressedHistoryBits.has(14);
-    const rightHistory = pressedHistoryBits.has(15);
-    const bothHistory = leftHistory && rightHistory;
-    const singleHistory = leftHistory !== rightHistory;
-
-    k15Knob.classList.toggle('active', leftActive || rightActive);
-    k15Knob.classList.toggle('pressed-history', bothHistory);
-    k15Knob.classList.toggle('pressed-history-striped', singleHistory);
-    k15Knob.classList.toggle('knob-left', leftActive && !rightActive);
-    k15Knob.classList.toggle('knob-right', rightActive && !leftActive);
-    k15Knob.classList.toggle('knob-center', !(leftActive ^ rightActive));
-  }
-
-  if (k15Title) {
-    if (leftActive && !rightActive) {
-      k15Title.textContent = 'ДИСТАНЦИОННЫЙ';
-    } else if (rightActive && !leftActive) {
-      k15Title.textContent = 'РЕМОНТ';
-    } else {
-      k15Title.textContent = 'МЕСТНЫЙ';
-    }
-  }
-
-  document.getElementById('status').textContent = `mask: ${mask.toString(16).toUpperCase().padStart(4, '0')}`;
+  statusEl.textContent = `mask: ${mask.toString(16).toUpperCase().padStart(4, '0')}`;
 }
 
-let pollInFlight = false;
-let pollTimer = null;
+function renderCurrentMask() {
+  renderMask(hwMask | manualMask);
+}
+
+function bindLocalInteraction() {
+  for (const [bit, el] of keysByBit) {
+    if (!el) continue;
+
+    const release = () => {
+      manualMask &= ~(1 << bit);
+      renderCurrentMask();
+    };
+
+    el.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      pressedHistoryBits.add(bit);
+      manualMask |= (1 << bit);
+      if (el.setPointerCapture) {
+        el.setPointerCapture(event.pointerId);
+      }
+      renderCurrentMask();
+    });
+
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('lostpointercapture', release);
+  }
+}
 
 async function pollKeyboardState() {
   if (pollInFlight) {
@@ -293,20 +181,21 @@ async function pollKeyboardState() {
     const response = await fetch('/keyboard_state.json', { cache: 'no-store' });
     const json = await response.json();
     const mask = parseInt(json.m, 16);
-    if (!Number.isNaN(mask) && mask !== prevMask) {
-      const lastMask = prevMask < 0 ? 0 : prevMask;
-      logPressedKeys(lastMask, mask);
-      prevMask = mask;
-      renderMask(mask);
+    if (!Number.isNaN(mask) && mask !== hwMask) {
+      logPressedKeys(hwMask, mask);
+      hwMask = mask;
+      renderCurrentMask();
     }
   } catch (error) {
-    console.log('Ошибка запроса состояния клавиатуры:', error.name);
+    console.log('keyboard state request error:', error.name);
   } finally {
     pollInFlight = false;
     pollTimer = setTimeout(pollKeyboardState, 300);
   }
 }
 
+bindLocalInteraction();
+renderCurrentMask();
 pollKeyboardState();
 </script>
 </body>
