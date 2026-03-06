@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
 <link rel="icon" href="data:;base64,iVBORw0KGgo=">
@@ -14,6 +14,12 @@ body { width:1280px; margin:auto; font-family: Arial, sans-serif; }
   margin: 20px auto;
   background: #efefef;
   border-radius: 10px;
+}
+.keyboard-content {
+  position: relative;
+  width: 820px;
+  height: 620px;
+  margin: 40px auto 0;
 }
 .key {
   position: absolute;
@@ -70,23 +76,27 @@ button { padding: 8px 14px; font-size: 16px; cursor: pointer; }
 </div>
 
 <div class="panel" id="keyboard_panel">
-  <div class="screen-placeholder"></div>
+  <div class="keyboard-content">
+    <div class="screen-placeholder"></div>
 
-  <div class="key" id="k_left" style="left:330px; top:48px;">&#8592;</div>
-  <div class="key" id="k_up" style="left:460px; top:48px;">&#8593;</div>
-  <div class="key" id="k_right" style="left:590px; top:48px;">&#8594;</div>
+    <div class="key" id="k_left" style="left:330px; top:48px;">&#8592;</div>
+    <div class="key" id="k_up" style="left:460px; top:48px;">&#8593;</div>
+    <div class="key" id="k_right" style="left:590px; top:48px;">&#8594;</div>
 
-  <div class="key" id="k_apply" style="left:330px; top:178px;"></div>
-  <div class="key" id="k_down" style="left:460px; top:178px;">&#8595;</div>
-  <div class="key" id="k_cancel" style="left:590px; top:178px;"></div>
+    <div class="key" id="k_apply" style="left:330px; top:178px;"></div>
+    <div class="key" id="k_down" style="left:460px; top:178px;">&#8595;</div>
+    <div class="key" id="k_cancel" style="left:590px; top:178px;"></div>
 
-  <div class="key-title" style="left:84px; top:350px;">&#1055;&#1091;&#1089;&#1082; 1</div>
-  <div class="key" id="k_start1" style="left:120px; top:405px;"></div>
+    <div class="key-title" style="left:84px; top:350px;">Увеличить давление</div>
+    <div class="key" id="k_start1" style="left:120px; top:405px;"></div>
 
-  <div class="key-title" style="left:290px; top:350px;">&#1089;&#1090;&#1086;&#1087; 1</div>
-  <div class="key" id="k_stop1" style="left:330px; top:405px;"></div>
+    <div class="key-title" style="left:290px; top:350px;">Уменьшить давление</div>
+    <div class="key" id="k_stop1" style="left:330px; top:405px;"></div>
 
-  <div class="key large" id="k_emergency" style="left:530px; top:382px;"></div>
+    <div class="key large" id="k_emergency" style="left:530px; top:382px;">
+    STOP
+	</div>
+  </div>
 </div>
 
 <script>
@@ -209,3 +219,4 @@ pollKeyboardState();
 </script>
 </body>
 </html>
+
