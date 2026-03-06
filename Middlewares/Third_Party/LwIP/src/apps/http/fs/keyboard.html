@@ -4,7 +4,7 @@
 <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Тест клавиатуры</title>
+<title>&#1058;&#1077;&#1089;&#1090; &#1082;&#1083;&#1072;&#1074;&#1080;&#1072;&#1090;&#1091;&#1088;&#1099;</title>
 <style>
 body { width:1280px; margin:auto; font-family: Arial, sans-serif; }
 .panel {
@@ -40,44 +40,53 @@ button { padding: 8px 14px; font-size: 16px; cursor: pointer; }
 .status { font-family: monospace; }
 .key-title {
   position: absolute;
-  width: 140px;
+  width: 170px;
   text-align: center;
   font-size: 20px;
-  color: #303030;
+  color: #202020;
   font-weight: 600;
   user-select: none;
+}
+.screen-placeholder {
+  position: absolute;
+  left: 110px;
+  top: 70px;
+  width: 150px;
+  height: 150px;
+  background: #f8f8f8;
+  border: 1px solid #111;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+@media (max-width: 1200px) {
+  .panel { transform: scale(0.75); transform-origin: top left; height: 560px; }
 }
 </style>
 </head>
 <body>
 <div class="topbar">
-  <button type="button" onclick="location.href='test.html'">&larr; Назад</button>
-  <h2>Тест клавиатуры</h2>
+  <button type="button" onclick="location.href='test.html'">&larr; &#1053;&#1072;&#1079;&#1072;&#1076;</button>
+  <h2>&#1058;&#1077;&#1089;&#1090; &#1082;&#1083;&#1072;&#1074;&#1080;&#1072;&#1090;&#1091;&#1088;&#1099;</h2>
   <div class="status" id="status">mask: ----</div>
 </div>
 
 <div class="panel" id="keyboard_panel">
-  <div class="key" id="k_left" style="left:455px; top:38px;">&#9664;</div>
-  <div class="key" id="k_up" style="left:560px; top:38px;">&#9650;</div>
-  <div class="key" id="k_right" style="left:665px; top:38px;">&#9654;</div>
+  <div class="screen-placeholder"></div>
 
-  <div class="key" id="k_apply" style="left:455px; top:168px;">&#10003;</div>
-  <div class="key-title" style="left:436px; top:278px;">ПРИМЕНИТЬ</div>
+  <div class="key" id="k_left" style="left:330px; top:48px;">&#8592;</div>
+  <div class="key" id="k_up" style="left:460px; top:48px;">&#8593;</div>
+  <div class="key" id="k_right" style="left:590px; top:48px;">&#8594;</div>
 
-  <div class="key-title" style="left:541px; top:128px;">МЕНЮ</div>
-  <div class="key" id="k_down" style="left:560px; top:168px;">&#9660;</div>
+  <div class="key" id="k_apply" style="left:330px; top:178px;"></div>
+  <div class="key" id="k_down" style="left:460px; top:178px;">&#8595;</div>
+  <div class="key" id="k_cancel" style="left:590px; top:178px;"></div>
 
-  <div class="key" id="k_cancel" style="left:665px; top:168px;">&#10005;</div>
-  <div class="key-title" style="left:646px; top:278px;">ОТМЕНИТЬ</div>
+  <div class="key-title" style="left:84px; top:350px;">&#1055;&#1091;&#1089;&#1082; 1</div>
+  <div class="key" id="k_start1" style="left:90px; top:405px;"></div>
 
-  <div class="key-title" style="left:70px; top:390px; width:160px;">УВЕЛИЧИТЬ ДАВЛЕНИЕ</div>
-  <div class="key" id="k_inc" style="left:90px; top:430px;"></div>
+  <div class="key-title" style="left:290px; top:350px;">&#1089;&#1090;&#1086;&#1087; 1</div>
+  <div class="key" id="k_stop1" style="left:300px; top:405px;"></div>
 
-  <div class="key-title" style="left:280px; top:390px; width:160px;">УМЕНЬШИТЬ ДАВЛЕНИЕ</div>
-  <div class="key" id="k_dec" style="left:300px; top:430px;"></div>
-
-  <div class="key-title" style="left:805px; top:360px;">АВАРИЙНЫЙ</div>
-  <div class="key large" id="k_emergency" style="left:800px; top:400px;">STOP</div>
+  <div class="key large" id="k_emergency" style="left:505px; top:382px;"></div>
 </div>
 
 <script>
@@ -87,8 +96,8 @@ const KEY_BINDINGS = [
   { bit: 2, id: 'k_down' },
   { bit: 3, id: 'k_left' },
   { bit: 4, id: 'k_cancel' },
-  { bit: 9, id: 'k_inc' },
-  { bit: 11, id: 'k_dec' },
+  { bit: 9, id: 'k_start1' },
+  { bit: 11, id: 'k_stop1' },
   { bit: 12, id: 'k_apply' },
   { bit: 13, id: 'k_emergency' }
 ];
@@ -99,8 +108,8 @@ const STM_KEY_NAMES = {
   2: 'key_down',
   3: 'key_left',
   4: 'key_cancel',
-  9: 'key_increase',
-  11: 'key_decrease',
+  9: 'key_start1',
+  11: 'key_stop1',
   12: 'key_apply',
   13: 'key_emergency_stop'
 };
