@@ -406,10 +406,6 @@ color: #f2f2f2;
 <div class="right_col"><button id="keyboard-test-btn" type="button" onclick="location.href='keyboard.html'">Запустить</button></div>
 </div>
 
-<div class="elem0">
-<div class="left_col">Тест watchdog</div>
-<div class="right_col"><button type="button">Запустить</button></div>
-</div>
 
 <div class="elem0">
 <div class="left_col">Тест UART</div>
@@ -449,8 +445,8 @@ color: #f2f2f2;
 </table>
 </div>
 <div class="elem0">
-<div class="left_col">&#1088;&#1091;&#1095;&#1085;&#1086;&#1077; &#1091;&#1087;&#1088;&#1072;&#1074;&#1083;&#1077;&#1085;&#1080;&#1077; &#1087;&#1080;&#1085;&#1072;&#1084;&#1080;</div>
-<div class="right_col"><button id="manual-pins-toggle" type="button">&#1056;&#1072;&#1079;&#1074;&#1077;&#1088;&#1085;&#1091;&#1090;&#1100;</button></div>
+<div class="left_col">Ручное управление пинами</div>
+<div class="right_col"><button id="manual-pins-toggle" type="button">Развернуть</button></div>
 </div>
 <div id="manual-pins-content" class="hide">
 <table class="pins-table">
@@ -462,7 +458,7 @@ color: #f2f2f2;
 </tr>
 </thead>
 <tbody>
-<tr><td>MODE</td><td>&#1088;&#1091;&#1095;&#1085;&#1086;&#1077; &#1091;&#1087;&#1088;&#1072;&#1074;&#1083;&#1077;&#1085;&#1080;&#1077; &#1087;&#1080;&#1085;&#1072;&#1084;&#1080;</td><td><button id="manual-mode-btn" type="button" class="pin-btn pin-off">&#1042;&#1099;&#1082;&#1083;</button></td></tr>
+<tr><td>MODE</td><td>Ручное управление пинами</td><td><button id="manual-mode-btn" type="button" class="pin-btn pin-off">Выкл</button></td></tr>
 <tr><td>PB2 (WDI)</td><td>Watchdog</td><td><button id="manual-pin-out_wdi" type="button" class="pin-btn pin-off" data-pin-name="wdi" data-state-key="out_wdi" disabled>0</button></td></tr>
 <tr><td>PC12 (UART1_RE_DE)</td><td>RS-485 CH1 RE/DE</td><td><button id="manual-pin-out_uart1_re_de" type="button" class="pin-btn pin-off" data-pin-name="uart1_re_de" data-state-key="out_uart1_re_de" disabled>0</button></td></tr>
 <tr><td>PA11 (UART2_RE_DE)</td><td>RS-485 CH2 RE/DE</td><td><button id="manual-pin-out_uart2_re_de" type="button" class="pin-btn pin-off" data-pin-name="uart2_re_de" data-state-key="out_uart2_re_de" disabled>0</button></td></tr>
@@ -478,13 +474,13 @@ color: #f2f2f2;
 </table>
 </div>
 <div class="elem0">
-<div class="left_col">&#1058;&#1077;&#1089;&#1090; &#1088;&#1077;&#1083;&#1077;</div>
-<div class="right_col"><button id="relay-test-toggle" type="button">&#1056;&#1072;&#1079;&#1074;&#1077;&#1088;&#1085;&#1091;&#1090;&#1100;</button></div>
+<div class="left_col">Тест реле</div>
+<div class="right_col"><button id="relay-test-toggle" type="button">Развернуть</button></div>
 </div>
 <div id="relay-test-content" class="hide">
 <div id="relay-test-note" class="relay-test-note"></div>
 <div class="relay-test-row">
-<button id="relay-test-run-btn" type="button" class="pin-btn pin-off">&#1058;&#1077;&#1089;&#1090;</button>
+<button id="relay-test-run-btn" type="button" class="pin-btn pin-off">Тест</button>
 <span id="relay-test-status" class="relay-test-status"></span>
 </div>
 </div>
@@ -503,13 +499,13 @@ color: #f2f2f2;
 
 <script>
 
-const TEXT_EXPAND = "\u0420\u0430\u0437\u0432\u0435\u0440\u043d\u0443\u0442\u044c";
-const TEXT_COLLAPSE = "\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c";
-const TEXT_ON = "\u0412\u043a\u043b";
-const TEXT_OFF = "\u0412\u044b\u043a\u043b";
-const TEXT_RELAY_TEST_BUTTON = "\u0422\u0435\u0441\u0442";
-const TEXT_RELAY_TEST_RUNNING = "\u0442\u0435\u0441\u0442 \u0438\u0434\u0435\u0442";
-const TEXT_RELAY_TEST_NOTE = "\u043f\u043e\u043a\u0430 \u043e\u0442\u043a\u0440\u044b\u0442 \u044d\u0442\u043e\u0442 \u0440\u0430\u0437\u0434\u0435\u043b, \u0444\u0443\u043d\u043a\u0446\u0438\u043e\u043d\u0430\u043b \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 \u043e\u0442\u043a\u043b\u044e\u0447\u0435\u043d";
+const TEXT_EXPAND = "Развернуть";
+const TEXT_COLLAPSE = "Свернуть";
+const TEXT_ON = "Вкл";
+const TEXT_OFF = "Выкл";
+const TEXT_RELAY_TEST_BUTTON = "Тест";
+const TEXT_RELAY_TEST_RUNNING = "тест идет";
+const TEXT_RELAY_TEST_NOTE = "Пока открыт этот раздел, функционал интерфейса отключен";
 
 const manualPinsConfig = [
 	{ buttonId: "manual-pin-out_wdi", stateKey: "out_wdi", pinName: "wdi" },
@@ -662,7 +658,7 @@ function onRelayTestToggle(expanded) {
 			updateRelayTestControls();
 			renderManualControls();
 			updatePinsPollingState();
-			alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0440\u0435\u0436\u0438\u043c \u0442\u0435\u0441\u0442\u0430 \u0440\u0435\u043b\u0435" + (status > 0 ? " (HTTP " + status + ")" : ""));
+			alert("Не удалось включить режим теста реле" + (status > 0 ? " (HTTP " + status + ")" : ""));
 		});
 	} else {
 		if (relayTestTimer != null) {
@@ -676,7 +672,7 @@ function onRelayTestToggle(expanded) {
 		sendManualPinsCommand({ relay_test_mode: 0 }, function() {
 			requestPinsState();
 		}, function(status) {
-			alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u044b\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0440\u0435\u0436\u0438\u043c \u0442\u0435\u0441\u0442\u0430 \u0440\u0435\u043b\u0435" + (status > 0 ? " (HTTP " + status + ")" : ""));
+			alert("Не удалось выключить режим теста реле" + (status > 0 ? " (HTTP " + status + ")" : ""));
 		});
 		setRelayUiLock(false);
 		renderManualControls();
@@ -699,13 +695,13 @@ function onRelayTestRunButtonClick() {
 			}, function(status) {
 				relayTestInProgress = false;
 				updateRelayTestControls();
-				alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c \u0442\u0435\u0441\u0442 \u0440\u0435\u043b\u0435" + (status > 0 ? " (HTTP " + status + ")" : ""));
+				alert("Не удалось завершить тест реле" + (status > 0 ? " (HTTP " + status + ")" : ""));
 			});
 		}, 30000);
 	}, function(status) {
 		relayTestInProgress = false;
 		updateRelayTestControls();
-		alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c \u0442\u0435\u0441\u0442 \u0440\u0435\u043b\u0435" + (status > 0 ? " (HTTP " + status + ")" : ""));
+		alert("Не удалось запустить тест реле" + (status > 0 ? " (HTTP " + status + ")" : ""));
 	});
 }
 
@@ -945,7 +941,7 @@ function onManualModeButtonClick() {
 			pendingManualMode = null;
 			renderManualControls();
 			updatePinsPollingState();
-			alert("\u041d\u0435\u0442 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f \u0440\u0435\u0436\u0438\u043c\u0430 \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f");
+			alert("Нет подтверждения режима ручного управления");
 		}
 	}, 5000);
 
@@ -956,7 +952,7 @@ function onManualModeButtonClick() {
 		pendingManualMode = null;
 		renderManualControls();
 		updatePinsPollingState();
-		alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0440\u0435\u0436\u0438\u043c \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f" + (status > 0 ? " (HTTP " + status + ")" : ""));
+		alert("Не удалось переключить режим ручного управления" + (status > 0 ? " (HTTP " + status + ")" : ""));
 	});
 }
 
@@ -980,7 +976,7 @@ function onManualPinButtonClick(cfg) {
 			delete pendingPinStates[cfg.stateKey];
 			renderManualControls();
 			updatePinsPollingState();
-			alert("\u041d\u0435\u0442 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u043f\u0438\u043d\u0430 " + cfg.pinName);
+			alert("Нет подтверждения изменения пина" + cfg.pinName);
 		}
 	}, 5000);
 
@@ -993,7 +989,7 @@ function onManualPinButtonClick(cfg) {
 		}
 		renderManualControls();
 		updatePinsPollingState();
-		alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u043f\u0438\u043d " + cfg.pinName + (status > 0 ? " (HTTP " + status + ")" : ""));
+		alert("Не удалось изменить пин " + cfg.pinName + (status > 0 ? " (HTTP " + status + ")" : ""));
 	});
 }
 
@@ -1021,7 +1017,7 @@ async function up() {
 			document.getElementById(`button${n}`).addEventListener("click", function() {
 				let sel_frame = document.getElementById(`group${n}`);
 				sel_frame.classList.toggle("hide");
-				sel_button.innerHTML == "��������" ? sel_button.innerHTML = "��������" : sel_button.innerHTML = "��������";
+				sel_button.innerHTML == "Показать" ? sel_button.innerHTML = "Свернуть" : sel_button.innerHTML = "Показать";
 			});
 			document.getElementById(`frame${n}`).style.display = "block";
 			let p = document.querySelector(`#group${n}`);
