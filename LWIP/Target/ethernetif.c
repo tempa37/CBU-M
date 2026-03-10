@@ -224,10 +224,8 @@ static int32_t ETH_PHY_InitWithRetry(uint32_t attempts)
       continue;
     }
 
-    if (ETH_PHY_ModeMatchesMAC() == 0)
-    {
-      continue;
-    }
+    /* Mode mismatch is diagnostic only; do not hard-fail PHY init here. */
+    (void)ETH_PHY_ModeMatchesMAC();
 
     (void)LAN8710_StartAutoNego(&LAN8710);
     return LAN8710_STATUS_OK;
@@ -335,74 +333,76 @@ static void low_level_init(struct netif *netif)
 /* USER CODE BEGIN PHY_PRE_CONFIG */
 
 /* USER CODE END PHY_PRE_CONFIG */
+  if (hal_eth_init_status != HAL_OK)
+  {
+    netif_set_link_down(netif);
+    netif_set_down(netif);
+    return;
+  }
+
   /* Set PHY IO functions + initialize PHY with retries */
   if (ETH_PHY_InitWithRetry(ETH_PHY_INIT_RETRY_COUNT) != LAN8710_STATUS_OK)
   {
-    Error_Handler();
+    netif_set_link_down(netif);
+    netif_set_down(netif);
+    return;
   }
 
-  if (hal_eth_init_status == HAL_OK)
+  PHYLinkState = LAN8710_GetLinkState(&LAN8710);
+
+  /* Get link state */
+  if(PHYLinkState <= LAN8710_STATUS_LINK_DOWN)
   {
-    PHYLinkState = LAN8710_GetLinkState(&LAN8710);
-    
-    /* Get link state */
-    if(PHYLinkState <= LAN8710_STATUS_LINK_DOWN)
-    {
-      netif_set_link_down(netif);
-      netif_set_down(netif);
-    }
-    else
-    {
-      switch (PHYLinkState)
-      {
-        case LAN8710_STATUS_100MBITS_FULLDUPLEX: {
-          duplex = ETH_FULLDUPLEX_MODE;
-          speed = ETH_SPEED_100M;        
-          break;
-        }        
-        case LAN8710_STATUS_100MBITS_HALFDUPLEX:{
-          duplex = ETH_HALFDUPLEX_MODE;
-          speed = ETH_SPEED_100M;        
-          break;
-        }        
-        case LAN8710_STATUS_10MBITS_FULLDUPLEX:{
-          duplex = ETH_FULLDUPLEX_MODE;
-          speed = ETH_SPEED_10M;
-          break;
-        }        
-        case LAN8710_STATUS_10MBITS_HALFDUPLEX:{
-          duplex = ETH_HALFDUPLEX_MODE;
-          speed = ETH_SPEED_10M;
-          break;
-        }        
-        case LAN8710_STATUS_AUTONEGO_NOTDONE:{
-          break;
-        }        
-        default:{
-          duplex = ETH_FULLDUPLEX_MODE;
-          speed = ETH_SPEED_100M;
-          break;
-        }
-      }
-      
-      /* Get MAC Config MAC */
-      HAL_ETH_GetMACConfig(&heth, &MACConf);
-      MACConf.DuplexMode = duplex;
-      MACConf.Speed = speed;
-      HAL_ETH_SetMACConfig(&heth, &MACConf);
-      
-      HAL_ETH_Start_IT(&heth);
-      netif_set_up(netif);
-      netif_set_link_up(netif);
-      
-      /* USER CODE BEGIN PHY_POST_CONFIG */
-      
-      /* USER CODE END PHY_POST_CONFIG */
-    }
+    netif_set_link_down(netif);
+    netif_set_down(netif);
   }
   else
   {
-    Error_Handler();
+    switch (PHYLinkState)
+    {
+      case LAN8710_STATUS_100MBITS_FULLDUPLEX: {
+        duplex = ETH_FULLDUPLEX_MODE;
+        speed = ETH_SPEED_100M;
+        break;
+      }
+      case LAN8710_STATUS_100MBITS_HALFDUPLEX:{
+        duplex = ETH_HALFDUPLEX_MODE;
+        speed = ETH_SPEED_100M;
+        break;
+      }
+      case LAN8710_STATUS_10MBITS_FULLDUPLEX:{
+        duplex = ETH_FULLDUPLEX_MODE;
+        speed = ETH_SPEED_10M;
+        break;
+      }
+      case LAN8710_STATUS_10MBITS_HALFDUPLEX:{
+        duplex = ETH_HALFDUPLEX_MODE;
+        speed = ETH_SPEED_10M;
+        break;
+      }
+      case LAN8710_STATUS_AUTONEGO_NOTDONE:{
+        break;
+      }
+      default:{
+        duplex = ETH_FULLDUPLEX_MODE;
+        speed = ETH_SPEED_100M;
+        break;
+      }
+    }
+
+    /* Get MAC Config MAC */
+    HAL_ETH_GetMACConfig(&heth, &MACConf);
+    MACConf.DuplexMode = duplex;
+    MACConf.Speed = speed;
+    HAL_ETH_SetMACConfig(&heth, &MACConf);
+
+    HAL_ETH_Start_IT(&heth);
+    netif_set_up(netif);
+    netif_set_link_up(netif);
+
+    /* USER CODE BEGIN PHY_POST_CONFIG */
+
+    /* USER CODE END PHY_POST_CONFIG */
   }
 #endif /* LWIP_ARP || LWIP_ETHERNET */
   
@@ -890,6 +890,13 @@ void ethernet_link_thread(void* argument)
     //linkupp++;
 #endif
       
+    if (LAN8710.Is_Initialized == 0U)
+    {
+      (void)ETH_PHY_InitWithRetry(1U);
+      osDelay(100);
+      continue;
+    }
+
     PHYLinkState = LAN8710_GetLinkState(&LAN8710);
     
     if(netif_is_link_up(netif) && (PHYLinkState <= LAN8710_STATUS_LINK_DOWN))
