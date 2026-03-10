@@ -4,133 +4,54 @@
 <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style type="text/css">
-
-body, input, button, select {
-font-family: Georgia, Times, Times New Roman, sans-serif ;
-font-style: normal;
-font-size: 15px;
-color: #1F2833;
-}
-input[type="text"] {
-width: 100%;
-box-sizing: border-box;
-}
-input[type="button"] {
-width: 150px;
-}
-input:invalid {
-background: #ffd8d8;
-}
-input:valid {
-background: #d8ffd8;
-}
-.hide {
-height: 0;
-transition: all 3s;
-display: none;
-}
-button {
-width: 150px;
-}
-.right_col {
-width: 40%;
-}
-.left_col {
-width: 60%;
-}
-.frame {
-display: none;
-width: 100%;
-}
-.pident {
-width: 100%;
-display: flex;
-justify-content: space-between;
-}
-.ident {
-text-align: center;
-background-color: #dff2ef;
-}
-.elem0 {
-display: flex;
-width: 100%;
-margin-bottom: 5px;
-margin-right: 0px;
-background-color: #dff2ef;
-}
-.pins-table {
-width: 100%;
-border-collapse: collapse;
-background-color: #f3faf8;
-margin: 6px 0;
-}
-.pins-table th, .pins-table td {
-border: 1px solid #b6d5cd;
-padding: 6px;
-text-align: left;
-font-size: 14px;
-}
-.pins-table th {
-background-color: #dff2ef;
-}
-.pin-value {
-font-weight: bold;
-min-width: 70px;
-}
-.pin-btn {
-width: 80px;
-height: 30px;
-border: 1px solid #7ea69a;
-border-radius: 4px;
-color: #ffffff;
-font-weight: bold;
-cursor: default;
-}
-.pin-btn.pin-on {
-background-color: #2b9b47;
-}
-.pin-btn.pin-off {
-background-color: #c65353;
-}
-.pin-btn.pin-pending {
-background-color: #c1841f;
-}
-.pin-btn:disabled {
-opacity: 1;
-}
-.pin-btn.manual-active {
-cursor: pointer;
-}
-.relay-test-note {
-margin: 6px 0;
-padding: 8px;
-border: 1px solid #d8c585;
-background-color: #fff9de;
-font-size: 14px;
-}
-.relay-test-row {
-display: flex;
-align-items: center;
-gap: 12px;
-margin: 6px 0 8px;
-}
-.relay-test-status {
-font-weight: bold;
-color: #7d5f06;
-}
-#relay-test-run-btn:disabled {
-background-color: #9b9b9b;
-border-color: #888888;
-color: #f2f2f2;
-}
+<style>
+body,input,button,select{font:15px/1.35 "Trebuchet MS","Segoe UI",sans-serif;color:#152028}
+*{box-sizing:border-box}
+body{max-width:760px;margin:0 auto;padding:18px 14px 24px;background:linear-gradient(180deg,#eff4f7,#d7e1e7)}
+input[type="text"],input[type="file"],input[type="button"],button{border:1px solid #bccad2;border-radius:12px;padding:9px 12px;background:#fff;transition:.18s ease}
+input[type="text"]{width:100%}
+input[type="file"]{width:100%;max-width:240px;background:#f8fbfc}
+input[type="button"],button{width:100%;max-width:180px;background:linear-gradient(180deg,#29495d,#1c2f3d);border-color:#1c2f3d;color:#f4f8fb;font-weight:700;cursor:pointer}
+input[type="button"],input[type="file"],button{margin:4px 8px 4px 0}
+input:invalid{background:#fff1f1}
+input:valid{background:#f2fbf6}
+.hide{display:none}
+.frame,#usk{width:100%;margin:0 0 12px}
+.right_col{width:44%}
+.left_col{width:56%;font-weight:600}
+.frame{display:block}
+.pident{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ident,.elem0{background:rgba(255,255,255,.84);border:1px solid #c7d4db;border-radius:16px;box-shadow:0 10px 24px rgba(22,39,51,.07)}
+.ident{padding:10px 8px;text-align:center;font-size:13px;font-weight:700}
+.elem0{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 8px;padding:10px 12px}
+label{display:block}
+hr{height:1px;margin:12px 0;border:0;background:linear-gradient(90deg,rgba(28,47,61,0),#90a8b6,rgba(28,47,61,0))}
+.right_col>div{text-align:center;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#29495d}
+.section-head{background:linear-gradient(135deg,#eef4f7,#dce7ed)}
+.pins-table{width:100%;border-collapse:separate;border-spacing:0;margin:4px 0 10px;background:#fff;border:1px solid #c7d4db;border-radius:16px;overflow:hidden}
+.pins-table th,.pins-table td{padding:7px 8px;text-align:left;font-size:13px;border-bottom:1px solid #dde5ea}
+.pins-table th{background:#eef4f7;color:#29495d;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.pins-table tr:last-child td{border-bottom:0}
+.pin-value{min-width:70px;font-weight:700;color:#29495d}
+.pin-btn{width:92px;max-width:92px;height:32px;margin:0;padding:0;border:0;border-radius:10px;color:#fff;font-weight:700;cursor:default}
+.pin-btn.pin-on{background:#2d8e5b}
+.pin-btn.pin-off{background:#b84f5c}
+.pin-btn.pin-pending{background:#c1902a}
+.pin-btn:disabled{opacity:1}
+.pin-btn.manual-active{cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.relay-test-note{margin:4px 0;padding:10px 12px;border:1px solid #e0d2a3;border-radius:12px;background:#fff7dc;font-size:13px}
+.relay-test-row{display:flex;align-items:center;gap:12px;margin:6px 0 4px}
+.relay-test-status{font-weight:700;color:#8a6508}
+#relay-test-run-btn:disabled{background:#8a949b;color:#eef2f4}
+#notice{padding:6px 2px;min-height:18px;color:#29495d;font-weight:700}
+@media(max-width:720px){body{padding:12px}.pident{grid-template-columns:repeat(2,1fr)}.elem0,.relay-test-row{flex-direction:column;align-items:stretch}.left_col,.right_col,input[type="button"],input[type="file"],button{width:100%;max-width:none}}
 </style>
 <title>Web конфигуратор</title>
 </head>
 
-<body style="width:640px; margin:0 auto;">
+<body>
 
-<div id="usk" style="width:100%;">
+<div id="usk">
 <hr/>
 <div class="pident">
 <div id="version" class="ident">Версия ПО 0.0.0</div>
@@ -139,7 +60,7 @@ color: #f2f2f2;
 <div id="uptime" class="ident">000 д 00 ч 00 м 00 c</div>
 </div>
 <hr/>
-<!-- 0 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="usk_ip">IP адрес устройства (192.168.72.70)</label>
@@ -148,7 +69,7 @@ color: #f2f2f2;
 <input type="text" id="usk_ip" name="ip" placeholder="Укажите IP" required>
 </div>
 </div>
-<!-- 1 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="usk_mask">Маска подсети (255.255.255.0)</label>
@@ -157,7 +78,7 @@ color: #f2f2f2;
 <input type="text" id="usk_mask" name="ip" placeholder="Укажите IP" required >
 </div>
 </div>
-<!-- 2 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="usk_gateway">Адрес шлюза (192.168.72.1)</label>
@@ -166,7 +87,7 @@ color: #f2f2f2;
 <input type="text" id="usk_gateway" name="ip" placeholder="Укажите IP" required >
 </div>
 </div>
-<!-- 3 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="self_id">Slave Modbus адрес (1) [1-247]</label>
@@ -175,7 +96,7 @@ color: #f2f2f2;
 <input type="text" id="self_id" name="id" placeholder="Укажите ID" required >
 </div>
 </div>
-<!-- 4 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="mb_rate">Время между опросом, мс</label>
@@ -184,7 +105,7 @@ color: #f2f2f2;
 <input type="text" id="mb_rate" name="port" placeholder="Укажите время" required pattern="\d{1,5}" >
 </div>
 </div>
-<!-- 5 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="mb_timeout">Время ожидания ответа, мс</label>
@@ -193,21 +114,21 @@ color: #f2f2f2;
 <input type="text" id="mb_timeout" name="port" placeholder="Укажите время" required pattern="\d{1,5}" >
 </div>
 </div>
-<!-- 6 -->
+
 <hr/>
 </div>
 
-<div id="frame1" class="frame" style="display: block;">
-<div class="elem0">
+<div id="frame1" class="frame">
+<div class="elem0 section-head">
 <div class="left_col">
 <button id="button1">Показать</button>
 </div>
 <div class="right_col">
-<div style="text-align:center;">Датчики давления</div>
+<div>Датчики давления</div>
 </div>
 </div>
 <div id="group1" class="hide">
-<!-- 6 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="sens1_id">Modbus адрес "Магистраль" [1-247]</label>
@@ -216,7 +137,7 @@ color: #f2f2f2;
 <input type="text" id="sens1_id" name="id" placeholder="Укажите ID" required >
 </div>
 </div>
-<!-- 7 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="sens2_id">Modbus адрес "Цилиндр" [1-247]</label>
@@ -225,7 +146,7 @@ color: #f2f2f2;
 <input type="text" id="sens2_id" name="id" placeholder="Укажите ID" required >
 </div>
 </div>
-<!-- 8 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="sens2_min_val">Рабочий диапазон давления от, МПа</label>
@@ -234,7 +155,7 @@ color: #f2f2f2;
 <input type="text" id="sens2_min_val" name="val" placeholder="Укажите величину" required >
 </div>
 </div>
-<!-- 9 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="sens2_max_val">Рабочий диапазон давления до, МПа</label>
@@ -243,74 +164,22 @@ color: #f2f2f2;
 <input type="text" id="sens2_max_val" name="val" placeholder="Укажите величину" required >
 </div>
 </div>
-<!-- 10 -->
-</div>
-<hr/>
-</div>
-<!--
-<div id="frame2" class="frame" style="display: none;">
-<div class="elem0">
-<div class="left_col">
-<button id="button2">Показать</button>
-</div>
-<div class="right_col">
-<div style="text-align:center;">Датчик перемещения</div>
-</div>
-</div>
-<div id="group2" class="hide">
-
-<div class="elem0">
-<div class="left_col">
-<label for="sens3_min_lim">Минимальное положение штока, мм</label>
-</div>
-<div class="right_col">
-<input type="text" id="sens3_min_lim" name="val" placeholder="Укажите величину" required >
-</div>
-</div>
-
-<div class="elem0">
-<div class="left_col">
-<label for="sens3_max_lim">Максимальное положение штока, мм</label>
-</div>
-<div class="right_col">
-<input type="text" id="sens3_max_lim" name="val" placeholder="Укажите величину" required >
-</div>
-</div>
-
-<div class="elem0">
-<div class="left_col">
-<label for="sens3_min_val">Рабочий диапазон штока от, мм</label>
-</div>
-<div class="right_col">
-<input type="text" id="sens3_min_val" name="val" placeholder="Укажите величину" required >
-</div>
-</div>
-
-<div class="elem0">
-<div class="left_col">
-<label for="sens3_max_val">Рабочий диапазон штока до, мм</label>
-</div>
-<div class="right_col">
-<input type="text" id="sens3_max_val" name="val" placeholder="Укажите величину" required >
-</div>
-</div>
 
 </div>
 <hr/>
 </div>
--->
 
-<div id="frame3" class="frame" style="display: block;">
-<div class="elem0">
+<div id="frame3" class="frame">
+<div class="elem0 section-head">
 <div class="left_col">
 <button id="button3">Показать</button>
 </div>
 <div class="right_col">
-<div style="text-align:center;">УРМ</div>
+<div>УРМ</div>
 </div>
 </div>
 <div id="group3" class="hide">
-<!-- 14 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="urm_id">Modbus адрес (2) [1-8]</label>
@@ -319,7 +188,7 @@ color: #f2f2f2;
 <input type="text" id="urm_id" name="id" placeholder="Укажите ID" required >
 </div>
 </div>
-<!-- 14 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="valve1_io">Выход "Клапан 1" &#8593; [1-8]</label>
@@ -328,7 +197,7 @@ color: #f2f2f2;
 <input type="text" id="valve1_io" name="inout" placeholder="Укажите номер" required >
 </div>
 </div>
-<!-- 15 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="valve2_io">Выход "Клапан 2" &#8595; [1-8]</label>
@@ -337,7 +206,7 @@ color: #f2f2f2;
 <input type="text" id="valve2_io" name="inout" placeholder="Укажите номер" required >
 </div>
 </div>
-<!-- 16 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="state_out_io">Выход "Состояние системы" [1-8]</label>
@@ -346,22 +215,22 @@ color: #f2f2f2;
 <input type="text" id="state_out_io" name="inout" placeholder="Укажите номер" required >
 </div>
 </div>
-<!-- 17 -->
+
 </div>
 <hr/>
 </div>
 
-<div id="frame4" class="frame" style="display: block;">
-<div class="elem0">
+<div id="frame4" class="frame">
+<div class="elem0 section-head">
 <div class="left_col">
 <button id="button4">Показать</button>
 </div>
 <div class="right_col">
-<div style="text-align:center;">УМВХ</div>
+<div>УМВХ</div>
 </div>
 </div>
 <div id="group4" class="hide">
-<!-- 18 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="umvh_id">Modbus адрес (1) [1-8]</label>
@@ -370,18 +239,7 @@ color: #f2f2f2;
 <input type="text" id="umvh_id" name="id" placeholder="Укажите ID" required >
 </div>
 </div>
-<!-- 19 -->
-<!--
-<div class="elem0">
-<div class="left_col">
-<label for="sens3_io">Вход "Датчик перемещения" [1-8]</label>
-</div>
-<div class="right_col">
-<input type="text" id="sens3_io" name="inout" placeholder="Укажите номер" required >
-</div>
-</div>
--->
-<!-- 20 -->
+
 <div class="elem0">
 <div class="left_col">
 <label for="state_in_io">Вход "Сигнал запуска" [1-8]</label>
@@ -394,8 +252,7 @@ color: #f2f2f2;
 <hr/>
 </div>
 
-
-<div id="frame5" class="frame" style="display: block;">
+<div id="frame5" class="frame">
 <div class="elem0">
 <div class="left_col">Тест EEPROM</div>
 <div class="right_col"><button type="button">Проверить связь</button></div>
@@ -405,7 +262,6 @@ color: #f2f2f2;
 <div class="left_col">Тест клавиатуры</div>
 <div class="right_col"><button id="keyboard-test-btn" type="button" onclick="location.href='keyboard.html'">Запустить</button></div>
 </div>
-
 
 <div class="elem0">
 <div class="left_col">Тест UART</div>
@@ -487,7 +343,7 @@ color: #f2f2f2;
 <hr/>
 </div>
 
-<div style="width:100%;">
+<div>
 <input type="button" id="save" onclick="SendSettings()" value="Сохранить">
 <input type="button" id="savefile" onclick="SaveFile()" value="Сохранить в файл">
 <input type="file" accept=".json" id="fileinput" onclick="LoadFile()">
