@@ -61,6 +61,10 @@ void ETH_IRQHandler(void);
 void DMA2_Stream7_IRQHandler(void);
 void TIM8_BRK_TIM12_IRQHandler(void);
 void TIM8_TRG_COM_TIM14_IRQHandler(void);
+#ifdef i2c
+void I2C1_EV_IRQHandler(void);
+void I2C1_ER_IRQHandler(void);
+#endif
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

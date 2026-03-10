@@ -56,7 +56,7 @@ static void OLED_WriteReg(uint8_t Reg)
     OLED_CS_0;
     SPI4W_Write_Byte(Reg);
     OLED_CS_1;
-#elif USE_IIC
+#elif USE_IIC && defined(i2c)
     I2C_Write_Byte(Reg,IIC_CMD);
 #endif
 }
@@ -68,7 +68,7 @@ static void OLED_WriteData(uint8_t Data)
     OLED_CS_0;
     SPI4W_Write_Byte(Data);
     OLED_CS_1;
-#elif USE_IIC
+#elif USE_IIC && defined(i2c)
     I2C_Write_Byte(Data,IIC_RAM);
 #endif
 }

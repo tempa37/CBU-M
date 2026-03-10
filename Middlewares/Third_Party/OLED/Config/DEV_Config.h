@@ -44,7 +44,9 @@ UBYTE System_Init(void);
 void System_Exit(void);
 
 UBYTE SPI4W_Write_Byte(UBYTE value);
+#ifdef i2c
 void I2C_Write_Byte(UBYTE value, UBYTE Cmd);
+#endif
 
 void write_data(uint8_t *data, uint16_t length);
 

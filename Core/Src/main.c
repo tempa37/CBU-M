@@ -24,6 +24,9 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#ifdef i2c
+#include "i2c.h"
+#endif
 
 #include "cmsis_os.h"
 
@@ -107,6 +110,9 @@ int main(void) {
 
   // Initialize all configured peripherals  
   MX_DMA_Init();
+#ifdef i2c
+  MX_I2C1_Init();
+#endif
   MX_SPI4_Init();
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();

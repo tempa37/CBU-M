@@ -28,6 +28,9 @@
  extern "C" {
 #endif
 
+/* Project feature switches --------------------------------------------------*/
+/* Comment out to build without user-side I2C support. */
+#define i2c
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 
@@ -53,7 +56,9 @@
 /* #define HAL_SRAM_MODULE_ENABLED */
 /* #define HAL_SDRAM_MODULE_ENABLED */
 /* #define HAL_HASH_MODULE_ENABLED */
-/* #define HAL_I2C_MODULE_ENABLED */
+#ifdef i2c
+#define HAL_I2C_MODULE_ENABLED
+#endif
 /* #define HAL_I2S_MODULE_ENABLED */
 /* #define HAL_IWDG_MODULE_ENABLED */
 /* #define HAL_LTDC_MODULE_ENABLED */

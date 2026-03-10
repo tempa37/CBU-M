@@ -50,14 +50,14 @@ function:
 *******************************************************************************/
 static void OLED_WriteReg(uint8_t Reg)
 {
-#if USE_IIC
+#if USE_IIC && defined(i2c)
     I2C_Write_Byte(Reg,IIC_CMD);
 #endif
 }
 
 static void OLED_WriteData(uint8_t Data)
 {	
-#if USE_IIC
+#if USE_IIC && defined(i2c)
     I2C_Write_Byte(Data,IIC_RAM);
 #endif
 }
