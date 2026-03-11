@@ -33,6 +33,7 @@ static bool KTV_IsUsedIndex(uint16_t index);
 static bool KTV_IsBusyState(KTVstate state);
 static uint8_t KTV_ReadAddressPin(void);
 static uint8_t KTV_ReadInitPin(void);
+static uint8_t KTV_NormalizeLineActive(uint8_t val);
 static void KTV_SetInitPinActive(uint8_t active);
 static void KTV_ResetMeasureBuffer(void);
 static void KTV_ClearDecodedItems(void);
@@ -71,6 +72,11 @@ static uint8_t KTV_ReadAddressPin(void) {
 
 static uint8_t KTV_ReadInitPin(void) {
   return (HAL_GPIO_ReadPin(PWR_KTV_GPIO_Port, PWR_KTV_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+}
+
+static uint8_t KTV_NormalizeLineActive(uint8_t val) {
+  /* KTV line is active-low: a device response pulls KTV_ADR down to 0. */
+  return (val == 0U) ? 1U : 0U;
 }
 
 static void KTV_SetInitPinActive(uint8_t active) {
@@ -292,7 +298,7 @@ void KTV_SetTickValue(uint8_t val) {
       uint32_t word = (uint32_t)BuffIdx / 64U;
       uint32_t bit = (uint32_t)BuffIdx % 64U;
 
-      if (val != 0U) {
+      if (KTV_NormalizeLineActive(val) != 0U) {
         Bitmap[word] |= (1ULL << bit);
       } else {
         Bitmap[word] &= ~(1ULL << bit);
