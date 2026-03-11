@@ -134,14 +134,18 @@ static bool KTV_ProcessProf(void) {
         run_start = (int32_t)i;
       }
       ++run_len;
-      if (run_len >= 5U) {
-        start_idx = run_start + (int32_t)KTV_START_PAUSE_IN_TICKS;
+    } else if (run_len != 0U) {
+      if (run_len >= KTV_SYNC_MIN_IN_TICKS) {
+        start_idx = run_start + (int32_t)run_len + (int32_t)KTV_START_PAUSE_IN_TICKS;
         break;
       }
-    } else {
       run_len = 0U;
       run_start = -1;
     }
+  }
+
+  if ((start_idx < 0) && (run_len >= KTV_SYNC_MIN_IN_TICKS)) {
+    start_idx = run_start + (int32_t)run_len + (int32_t)KTV_START_PAUSE_IN_TICKS;
   }
 
   if (start_idx < 0) {
