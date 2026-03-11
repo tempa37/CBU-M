@@ -59,7 +59,8 @@ static void KTV_Unlock(uint32_t primask) {
 }
 
 static bool KTV_IsUsedIndex(uint16_t index) {
-  return (index <= KTV_USED_NUM) || (index >= KTV_DPP_POS);
+  (void)index;
+  return true;
 }
 
 static bool KTV_IsBusyState(KTVstate state) {
