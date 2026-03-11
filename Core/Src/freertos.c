@@ -35,6 +35,7 @@
 #include "usart.h"
 #include "menu.h"
 #include "keyboard.h"
+#include "ktv.h"
 
 #include "manage_settings.h"
 #include "ring_line.h"
@@ -117,6 +118,13 @@ const osThreadAttr_t main_task_handle_attr = {
 osThreadId_t ring_line_task_handle;
 const osThreadAttr_t ring_line_task_handle_attr = {
   .name = "RingLine",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+
+osThreadId_t ktv_task_handle;
+const osThreadAttr_t ktv_task_handle_attr = {
+  .name = "KTV",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
@@ -218,6 +226,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 static void startDefaultTask(void *argument);
 static void wdi_thread(void *argument);
 static void main_task_thread(void *argument);
+static void ktv_task_thread(void *argument);
 static void ring_line_thread(void *argument);
 static void uart_test_set_rs485(uint8_t tx1, uint8_t tx3);
 static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *rx_uart, uint8_t tx1, const uint8_t *packet, uint16_t len, const char *name, uint8_t *ok);
@@ -305,6 +314,7 @@ void MX_FREERTOS_Init(void) {
   
   //
   main_task_handle = osThreadNew(main_task_thread, NULL, &main_task_handle_attr);
+  ktv_task_handle = osThreadNew(ktv_task_thread, NULL, &ktv_task_handle_attr);
   ring_line_task_handle = osThreadNew(ring_line_thread, NULL, &ring_line_task_handle_attr);
 }
 
@@ -986,6 +996,15 @@ void delayed_start_callback(void *argument) {
   switch_state = 1;
 }
 */
+static void ktv_task_thread(void *argument) {
+  (void) argument;
+
+  while (1) {
+    KTV_Process(kmNone);
+    osDelay(10);
+  }
+}
+
 static void ring_line_thread(void *argument) {
   (void) argument;
 

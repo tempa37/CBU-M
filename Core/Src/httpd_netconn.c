@@ -16,6 +16,8 @@
 #include "ring_line.h"
 #include "main.h"
 #include "keyboard.h"
+#include "ktv.h"
+#include <stdio.h>
 
 // for function mktime() & difftime()
 //#include <time.h>
@@ -32,6 +34,7 @@ static int jsoneq(const char *json, jsmntok_t *tok, const char *s);
 static void stage_set(struct netconn *conn, uint8_t config);
 static void stage_pins(struct netconn *conn);
 static void stage_keyboard_state(struct netconn *conn);
+static void stage_ktv_state(struct netconn *conn);
 static void manual_pin_write_by_name(const char *pin_name, uint8_t value);
 static uint8_t manual_pin_read_pb15(void);
 static void relay_test_set_mode(uint8_t enable);
@@ -913,6 +916,68 @@ static void uart_test_result(struct netconn *conn) {
     osSemaphoreRelease(httpdbufSemaphore);
   }
 }
+static void ktv_start(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    uint8_t started = KTV_RequestPoll();
+
+    memset(html, 0, HTML_LEN);
+    length_html = (uint16_t)snprintf((char *)html, HTML_LEN, "{\"started\":%u}", started);
+    send_response(conn);
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
+static void stage_ktv_state(struct netconn *conn) {
+  if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+    tsKtvWebSnapshot snapshot;
+    uint16_t i;
+
+    KTV_GetSnapshot(&snapshot);
+
+    memset(html, 0, HTML_LEN);
+    length_html = (uint16_t)snprintf(
+      (char *)html,
+      HTML_LEN,
+      "{\"busy\":%u,\"ready\":%u,\"init\":%u,\"line\":%u,\"state\":%u,\"pending\":%u,\"poll_counter\":%lu,\"items\":[",
+      snapshot.busy,
+      snapshot.ready,
+      snapshot.init_pin,
+      snapshot.line_pin,
+      snapshot.state,
+      snapshot.poll_pending,
+      (unsigned long)snapshot.poll_counter
+    );
+
+    for (i = 0U; i <= KTV_NUM_MAX; ++i) {
+      int written = snprintf(
+        (char *)(html + length_html),
+        HTML_LEN - length_html,
+        "%s{\"id\":%u,\"u\":%u,\"f\":%u,\"b\":%u,\"o\":%u,\"g\":%u,\"a\":%u}",
+        (i == 0U) ? "" : ",",
+        i,
+        snapshot.items[i].used,
+        snapshot.items[i].flags,
+        snapshot.items[i].before,
+        snapshot.items[i].online,
+        snapshot.items[i].gap,
+        snapshot.items[i].after
+      );
+
+      if ((written < 0) || ((uint16_t)written >= (HTML_LEN - length_html))) {
+        break;
+      }
+      length_html += (uint16_t)written;
+    }
+
+    if (length_html < (HTML_LEN - 2U)) {
+      length_html += (uint16_t)snprintf((char *)(html + length_html), HTML_LEN - length_html, "]}");
+    }
+
+    send_response(conn);
+    osSemaphoreRelease(httpdbufSemaphore);
+  }
+}
+
 
 static void http_server(struct netconn *conn) {
   struct netbuf *inbuf;
@@ -985,6 +1050,12 @@ static void http_server(struct netconn *conn) {
           }
           else if (strncmp(buf, "GET /keyboard_state.json", 24) == 0) {
             stage_keyboard_state(conn);
+          }
+          else if (strncmp(buf, "GET /ktv_start", 14) == 0) {
+            ktv_start(conn);
+          }
+          else if (strncmp(buf, "GET /ktv_state.json", 19) == 0) {
+            stage_ktv_state(conn);
           }
           else if (strncmp(buf, "GET /uart_test_start", 20) == 0) {
             uart_test_start(conn);

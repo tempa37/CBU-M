@@ -43,6 +43,7 @@ hr{height:1px;margin:12px 0;border:0;background:linear-gradient(90deg,rgba(28,47
 .relay-test-row{display:flex;align-items:center;gap:12px;margin:6px 0 4px}
 .relay-test-status{font-weight:700;color:#8a6508}
 #relay-test-run-btn:disabled{background:#8a949b;color:#eef2f4}
+.ktv-summary{text-align:left!important;font-weight:600!important;letter-spacing:normal!important;text-transform:none!important;font-size:13px;color:#29495d}
 #notice{padding:6px 2px;min-height:18px;color:#29495d;font-weight:700}
 @media(max-width:720px){body{padding:12px}.pident{grid-template-columns:repeat(2,1fr)}.elem0,.relay-test-row{flex-direction:column;align-items:stretch}.left_col,.right_col,input[type="button"],input[type="file"],button{width:100%;max-width:none}}
 </style>
@@ -269,6 +270,29 @@ hr{height:1px;margin:12px 0;border:0;background:linear-gradient(90deg,rgba(28,47
 </div>
 
 <div class="elem0">
+<div class="left_col">Опрос КТВ</div>
+<div class="right_col"><button id="ktv-toggle" type="button">Развернуть</button></div>
+</div>
+<div id="ktv-content" class="hide">
+<div class="elem0">
+<div class="left_col"><button id="ktv-start-btn" type="button">Начать опрос КТВ</button></div>
+<div class="right_col"><div id="ktv-summary" class="ktv-summary">Нет данных</div></div>
+</div>
+<table class="pins-table">
+<thead>
+<tr>
+<th>КТВ</th>
+<th>Состояние</th>
+<th>Профиль</th>
+</tr>
+</thead>
+<tbody id="ktv-table-body">
+<tr><td colspan="3">Нет данных</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="elem0">
 <div class="left_col">Состояние пинов</div>
 <div class="right_col"><button id="pins-toggle" type="button">Развернуть</button></div>
 </div>
@@ -362,6 +386,8 @@ const TEXT_OFF = "Выкл";
 const TEXT_RELAY_TEST_BUTTON = "Тест";
 const TEXT_RELAY_TEST_RUNNING = "тест идет";
 const TEXT_RELAY_TEST_NOTE = "Пока открыт этот раздел, функционал интерфейса отключен";
+const TEXT_KTV_START = "Начать опрос КТВ";
+const TEXT_KTV_WAIT = "Ожидайте";
 
 const manualPinsConfig = [
 	{ buttonId: "manual-pin-out_wdi", stateKey: "out_wdi", pinName: "wdi" },
@@ -387,6 +413,9 @@ let relaySectionActive = false;
 let relayModeReady = false;
 let relayTestInProgress = false;
 let relayTestTimer = null;
+let ktvPollTimer = null;
+let ktvWaitingResult = false;
+let latestKtvState = null;
 
 function isSectionExpanded(contentId) {
 	let content = document.getElementById(contentId);
@@ -571,6 +600,186 @@ function initRelayTestControls() {
 		runBtn.addEventListener("click", onRelayTestRunButtonClick);
 	}
 	updateRelayTestControls();
+}
+
+function ktvStateToText(state) {
+	let normalized = Number(state);
+	if (normalized === 4) {
+		return "стартовый импульс";
+	}
+	if (normalized === 5) {
+		return "ожидание синхро";
+	}
+	if (normalized === 6) {
+		return "чтение";
+	}
+	if (normalized === 7) {
+		return "обработка";
+	}
+	if (normalized === 8) {
+		return "нет активности";
+	}
+	return "ожидание";
+}
+
+function ktvFlagsToText(item, ready) {
+	let used = Number(item.u) === 1;
+	let flags = Number(item.f) || 0;
+	let parts = [];
+	if (!used) {
+		return "не используется";
+	}
+	if (!ready) {
+		return "нет данных";
+	}
+	if ((flags & 1) !== 0) {
+		parts.push("онлайн");
+	} else {
+		parts.push("нет ответа");
+	}
+	if ((flags & 2) !== 0) {
+		parts.push("сработал");
+	}
+	if ((flags & 4) !== 0) {
+		parts.push("ошибка");
+	}
+	return parts.join(", ");
+}
+
+function ktvProfileToText(item, ready) {
+	if (Number(item.u) !== 1 || !ready) {
+		return "-";
+	}
+	return (Number(item.b) || 0) + "/" + (Number(item.o) || 0) + "/" + (Number(item.g) || 0) + "/" + (Number(item.a) || 0);
+}
+
+function updateKtvButton() {
+	let btn = document.getElementById("ktv-start-btn");
+	let busy = latestKtvState != null && Number(latestKtvState.busy) === 1;
+	if (btn != null) {
+		btn.textContent = (ktvWaitingResult || busy) ? TEXT_KTV_WAIT : TEXT_KTV_START;
+		btn.disabled = ktvWaitingResult || busy;
+	}
+}
+
+function renderKtvState(data) {
+	if (data == null) {
+		return;
+	}
+	latestKtvState = data;
+	let summary = document.getElementById("ktv-summary");
+	let body = document.getElementById("ktv-table-body");
+	let items = Array.isArray(data.items) ? data.items : [];
+	let ready = Number(data.ready) === 1;
+	let rows = "";
+	let i;
+
+	if (summary != null) {
+		summary.textContent = "Статус: " + ktvStateToText(data.state) + " | KTV_INIT: " + data.init + " | KTV_ADR: " + data.line;
+	}
+
+	for (i = 0; i < items.length; i++) {
+		rows += "<tr><td>KTV " + items[i].id + "</td><td>" + ktvFlagsToText(items[i], ready) + "</td><td>" + ktvProfileToText(items[i], ready) + "</td></tr>";
+	}
+
+	if (body != null) {
+		body.innerHTML = rows.length > 0 ? rows : "<tr><td colspan=\"3\">Нет данных</td></tr>";
+	}
+
+	if (Number(data.busy) !== 1 && ready) {
+		ktvWaitingResult = false;
+	}
+	updateKtvButton();
+	updateKtvPollingState();
+}
+
+function requestKtvState() {
+	if (!isSectionExpanded("ktv-content") && !ktvWaitingResult) {
+		return;
+	}
+	let xhr = new XMLHttpRequest();
+	xhr.open("GET", "/ktv_state.json", true);
+	xhr.timeout = 2000;
+	xhr.onload = function() {
+		if (xhr.status == 200 && xhr.responseText.length > 0) {
+			try {
+				renderKtvState(JSON.parse(xhr.responseText));
+			} catch (e) {
+				console.log("KTV JSON parse error");
+			}
+		}
+	};
+	xhr.onerror = function() {
+		console.log("KTV state request failed");
+	};
+	xhr.send();
+}
+
+function startKtvPolling() {
+	if (ktvPollTimer != null) {
+		return;
+	}
+	requestKtvState();
+	ktvPollTimer = setInterval(requestKtvState, 1000);
+}
+
+function stopKtvPolling() {
+	if (ktvPollTimer != null) {
+		clearInterval(ktvPollTimer);
+		ktvPollTimer = null;
+	}
+}
+
+function updateKtvPollingState() {
+	if (isSectionExpanded("ktv-content") || ktvWaitingResult) {
+		startKtvPolling();
+	} else {
+		stopKtvPolling();
+	}
+}
+
+function startKtvPoll() {
+	let xhr = new XMLHttpRequest();
+	let btn = document.getElementById("ktv-start-btn");
+	if (btn != null && btn.disabled) {
+		return;
+	}
+	ktvWaitingResult = true;
+	updateKtvButton();
+	updateKtvPollingState();
+	xhr.open("GET", "/ktv_start", true);
+	xhr.timeout = 2000;
+	xhr.onload = function() {
+		if (xhr.status == 200) {
+			requestKtvState();
+		} else {
+			ktvWaitingResult = false;
+			updateKtvButton();
+			updateKtvPollingState();
+			alert("Не удалось запустить опрос КТВ");
+		}
+	};
+	xhr.onerror = function() {
+		ktvWaitingResult = false;
+		updateKtvButton();
+		updateKtvPollingState();
+		alert("Ошибка запроса запуска опроса КТВ");
+	};
+	xhr.send();
+}
+
+function initKtvControls() {
+	let btn = document.getElementById("ktv-start-btn");
+	if (btn != null) {
+		btn.addEventListener("click", startKtvPoll);
+	}
+	initCollapsibleSection("ktv-toggle", "ktv-content", function(expanded) {
+		updateKtvPollingState();
+		if (expanded) {
+			requestKtvState();
+		}
+	});
+	updateKtvButton();
 }
 
 function initPinStateToggle() {
@@ -891,8 +1100,10 @@ window.onload = function() {
 	}
 	initPinStateToggle();
 	initRelayTestControls();
+	initKtvControls();
 	initManualControls();
 	updatePinsPollingState();
+	updateKtvPollingState();
 }
 </script>
 </html>

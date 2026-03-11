@@ -34,6 +34,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "version.h"
+#include "ktv.h"
 #include "ring_line.h"
 
 /* USER CODE END Includes */
@@ -118,7 +119,9 @@ int main(void) {
   MX_USART3_UART_Init();
   MX_TIM12_Init();
   MX_TIM14_Init();
+  KTV_Init();
   Start_IT_TIM12();
+  Start_IT_TIM14();
   
     // reset lan8710
   HAL_GPIO_WritePin(RST_PHYLAN_Port, RST_PHYLAN_Pin, GPIO_PIN_RESET);
@@ -210,6 +213,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     uint8_t opto_2_1 = (uint8_t)HAL_GPIO_ReadPin(MCU_BLK_2_1_GPIO_Port, MCU_BLK_2_1_Pin);
     uint8_t opto_2_2 = (uint8_t)HAL_GPIO_ReadPin(MCU_BLK_2_2_GPIO_Port, MCU_BLK_2_2_Pin);
     ring_line_capture_isr(opto_1_1, opto_1_2, opto_2_1, opto_2_2);
+  } else if (htim->Instance == TIM14) {
+    uint8_t ktv_value = ((KTV_ADR_GPIO_Port->IDR & KTV_ADR_Pin) != 0U) ? 1U : 0U;
+    KTV_SetTickValue(ktv_value);
   }
 }
 

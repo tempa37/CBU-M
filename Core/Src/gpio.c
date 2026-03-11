@@ -42,13 +42,14 @@ void MX_GPIO_Init(void) {
   
   // SET
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(PWR_KTV_GPIO_Port, PWR_KTV_Pin, GPIO_PIN_SET);
   //HAL_GPIO_WritePin(GPIOE, BDU1_M_S_Pin|BDU2_M_S_Pin, GPIO_PIN_SET);
   
   // RESET
   {
     //HAL_GPIO_WritePin(GPIOE, BDU1_M_S_Pin|BDU2_M_S_Pin, GPIO_PIN_RESET);
     
-    HAL_GPIO_WritePin(GPIOE, PWR_KTV_Pin|OLED_DC_Pin|OLED_CS_Pin|OLED_RST_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOE, OLED_DC_Pin|OLED_CS_Pin|OLED_RST_Pin, GPIO_PIN_RESET);
     
     HAL_GPIO_WritePin(WDI_GPIO_Port, WDI_Pin, GPIO_PIN_RESET);
     

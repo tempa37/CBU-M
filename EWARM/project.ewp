@@ -1195,6 +1195,12 @@
                     <name>$PROJ_DIR$\..\Core\Src\httpd_netconn.c</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\Core\Inc\ktv.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Src\ktv.c</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\Core\Src\keyboard.c</name>
                 </file>
                 <file>
