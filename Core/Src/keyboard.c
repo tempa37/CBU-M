@@ -121,10 +121,12 @@ void keyboard_probe(void) {
     (uint8_t)(KEYBOARD_PCF8575_INPUT_STATE >> 8),
   };
   uint16_t raw_state = 0U;
+  HAL_StatusTypeDef state = HAL_ERROR;
 
   keyboard_use_expander = 0U;
 
-  if (HAL_I2C_IsDeviceReady(&hi2c1, KEYBOARD_PCF8575_ADDR, KEYBOARD_I2C_READY_TRIES, KEYBOARD_I2C_TIMEOUT_MS) != HAL_OK) {
+  state = HAL_I2C_IsDeviceReady(&hi2c1, KEYBOARD_PCF8575_ADDR, KEYBOARD_I2C_READY_TRIES, 500U);
+  if (state != HAL_OK) {
     return;
   }
 
