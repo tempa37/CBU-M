@@ -469,6 +469,7 @@ void stage_set(struct netconn *conn, uint8_t config) {
 #else
     uint8_t eeprom_ready = 0U;
 #endif
+    uint8_t keyboard_ready = keyboard_i2c_ready;
     memset(html, 0, HTML_LEN);
     
     length_html = 0;
@@ -509,6 +510,7 @@ void stage_set(struct netconn *conn, uint8_t config) {
     length_html += sprintf((char*)(html + length_html), "\"mac1\":\"%X\",", identification.mac_octet_5);
     // int to string hex value
     length_html += sprintf((char*)(html + length_html), "\"mac0\":\"%X\",", identification.mac_octet_6);
+    length_html += sprintf((char*)(html + length_html), "\"keyboard_i2c_ready\":%u,", keyboard_ready);
     length_html += sprintf((char*)(html + length_html), "\"eeprom_ready\":%u,", eeprom_ready);
     length_html += sprintf((char*)(html + length_html), "\"uptime\":\"%d\"}", HAL_GetTick()/1000);
     

@@ -229,9 +229,11 @@ n(Math.floor(min % 60), 2) +' м ' + n(Math.floor(settings_json.uptime % 60), 2)
 
 document.getElementById("uptime").textContent = out_time;
 
-let eepromStatus = document.getElementById("eeprom-status");
-if (eepromStatus != null) {
-eepromStatus.textContent = Number(settings_json.eeprom_ready) === 1 ? "связь с eeprom есть" : "связь с eeprom нет";
+let i2cStatus = document.getElementById("i2c-status");
+if (i2cStatus != null) {
+let keyboardStatus = Number(settings_json.keyboard_i2c_ready) === 1 ? "клавиатура на связи" : "клавиатура не на связи";
+let eepromStatus = Number(settings_json.eeprom_ready) === 1 ? "eeprom на связи" : "eeprom не на связи";
+i2cStatus.innerHTML = keyboardStatus + "<br>" + eepromStatus;
 }
 // 1
 document.getElementById("usk_ip").value = settings_json.usk_ip;

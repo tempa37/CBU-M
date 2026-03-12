@@ -45,6 +45,7 @@ const osThreadAttr_t keyboard_task_handle_attr = {
 
 static volatile uint16_t keyboard_web_mask = 0U;
 static volatile uint8_t keyboard_use_expander = 0U;
+volatile uint8_t keyboard_i2c_ready = 0U;
 
 static void keyboard_routine(uint8_t* id, uint8_t key_id, uint32_t* event_tick, uint8_t* button_id);
 
@@ -129,6 +130,7 @@ void keyboard_probe(void) {
   HAL_StatusTypeDef state = HAL_ERROR;
 
   keyboard_use_expander = 0U;
+  keyboard_i2c_ready = 0U;
 
   state = HAL_I2C_IsDeviceReady(&hi2c1, KEYBOARD_PCF8575_ADDR, KEYBOARD_I2C_READY_TRIES, 500U);
   if (state != HAL_OK) {
@@ -144,8 +146,10 @@ void keyboard_probe(void) {
   }
 
   keyboard_use_expander = 1U;
+  keyboard_i2c_ready = 1U;
 #else
   keyboard_use_expander = 0U;
+  keyboard_i2c_ready = 0U;
 #endif
 }
 

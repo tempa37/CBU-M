@@ -56,6 +56,7 @@ typedef struct _button {
 extern osMessageQueueId_t keyboard_msg_queue;
 extern osThreadId_t keyboard_task_handle;
 extern const osThreadAttr_t keyboard_task_handle_attr;
+extern volatile uint8_t keyboard_i2c_ready;
 
 void keyboard_probe(void);
 void keyboard_thread(void *argument);
