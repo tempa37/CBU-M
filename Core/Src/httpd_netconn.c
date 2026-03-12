@@ -980,13 +980,14 @@ static void stage_ktv_state(struct netconn *conn) {
 
 
 static void http_server(struct netconn *conn) {
-  struct netbuf *inbuf;
+  struct netbuf *inbuf = NULL;
   char* buf;
   uint16_t buflen;
   struct fs_file file;
 
   char tmp[16];
   err_t err;
+  bool close_connection = false;
 /*  
   int keep_alive = 0;
   int keep_idle = 2;
@@ -1009,6 +1010,8 @@ static void http_server(struct netconn *conn) {
     if (err == ERR_OK) {      
       recv_count++;
       do {
+        bool request_in_progress = false;
+
         netbuf_data(inbuf, (void**)&buf, &buflen);
         // Is this an HTTP GET command?
         if ((buflen >= 5) && (strncmp(buf, "GET /", 5) == 0)) {
@@ -1089,6 +1092,8 @@ static void http_server(struct netconn *conn) {
             netconn_write(conn, (const unsigned char*)(file.data), (size_t)file.len, NETCONN_COPY);
             fs_close(&file);
           }
+
+          close_connection = true;
         }
         // Is this an HTTP POST command?
         else {
@@ -1096,9 +1101,8 @@ static void http_server(struct netconn *conn) {
           if (ret == STATUS_NONE) {
             // ignore
           } else if (ret == STATUS_INPROGRESS) {
-            
             // Don't close the connection!
-
+            request_in_progress = true;
             netconn_set_recvtimeout(conn, 10000);
             //tcp_nagle_disable(conn->pcb.tcp);
           } else {
@@ -1115,7 +1119,8 @@ static void http_server(struct netconn *conn) {
             if (ret == STATUS_NONE) {
               // ignore
             } else if (ret == STATUS_INPROGRESS) {
-              // Don't close the connection!              
+              // Don't close the connection!
+              request_in_progress = true;
             } else {
               // Some result, we should close the connection now
 
@@ -1401,17 +1406,26 @@ static void http_server(struct netconn *conn) {
               } // (ret == POST_STATUS_DONE)
             }
           }
+
+          if (!request_in_progress) {
+            close_connection = true;
+          }
         }
 #ifdef DEBUG
         WM_HTTPD = uxTaskGetStackHighWaterMark(NULL);
 #endif
-      } while (netbuf_next(inbuf) >= 0);
+      } while (!close_connection && (netbuf_next(inbuf) >= 0));
       //
       netbuf_delete(inbuf);
-      err = netconn_recv(conn, &inbuf);
+      inbuf = NULL;
+      if (!close_connection) {
+        err = netconn_recv(conn, &inbuf);
+      }
     }
-  } while (err == ERR_OK);
-  netbuf_delete(inbuf);
+  } while ((err == ERR_OK) && !close_connection);
+  if (inbuf != NULL) {
+    netbuf_delete(inbuf);
+  }
 }
 
 /**
