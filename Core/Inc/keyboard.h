@@ -18,6 +18,15 @@
 #define KEYBOARD_WEB_BIT_STOP           (1U << 11)
 #define KEYBOARD_WEB_BIT_APPLY          (1U << 12)
 #define KEYBOARD_WEB_BIT_EMERGENCY_STOP (1U << 13)
+#define KEYBOARD_WEB_MASK_ALL           (KEYBOARD_WEB_BIT_RIGHT          | \
+                                         KEYBOARD_WEB_BIT_UP             | \
+                                         KEYBOARD_WEB_BIT_DOWN           | \
+                                         KEYBOARD_WEB_BIT_LEFT           | \
+                                         KEYBOARD_WEB_BIT_CANCEL         | \
+                                         KEYBOARD_WEB_BIT_START          | \
+                                         KEYBOARD_WEB_BIT_STOP           | \
+                                         KEYBOARD_WEB_BIT_APPLY          | \
+                                         KEYBOARD_WEB_BIT_EMERGENCY_STOP)
 
 typedef enum key {
   KEY_ID_NO,
@@ -48,7 +57,9 @@ extern osMessageQueueId_t keyboard_msg_queue;
 extern osThreadId_t keyboard_task_handle;
 extern const osThreadAttr_t keyboard_task_handle_attr;
 
+void keyboard_probe(void);
 void keyboard_thread(void *argument);
+uint16_t keyboard_read_state_mask(void);
 uint16_t keyboard_get_web_mask(void);
 
 #endif /* __KEYBOARD_H__ */

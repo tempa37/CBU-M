@@ -241,6 +241,7 @@ static void uart_test_run_once(UART_HandleTypeDef *tx_uart, UART_HandleTypeDef *
   */
 void MX_FREERTOS_Init(void) {
   load_settings();
+  keyboard_probe();
 
   MACAddr[0] = 0x00;
   MACAddr[1] = 0x10;
@@ -256,7 +257,8 @@ void MX_FREERTOS_Init(void) {
   }  
 
   // button "to the right" and button "to the left"
-  if ((HAL_GPIO_ReadPin(K1_Port, K1_Pin) == 0 && HAL_GPIO_ReadPin(K3_Port, K3_Pin) == 0) || 
+  if (((keyboard_read_state_mask() & (KEYBOARD_WEB_BIT_RIGHT | KEYBOARD_WEB_BIT_LEFT)) ==
+       (KEYBOARD_WEB_BIT_RIGHT | KEYBOARD_WEB_BIT_LEFT)) ||
       settings.self_ip_addr.addr == IPADDR_NONE || 
         settings.self_ip_addr.addr == IPADDR_ANY) 
   {
