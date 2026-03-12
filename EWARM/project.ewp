@@ -297,7 +297,7 @@
                 <option>
                     <name>CCAllowList</name>
                     <version>1</version>
-                    <state>10010100</state>
+                    <state>00000000</state>
                 </option>
                 <option>
                     <name>CCDebugInfo</name>
@@ -406,7 +406,7 @@
                 </option>
                 <option>
                     <name>CCOptLevel</name>
-                    <state>2</state>
+                    <state>0</state>
                 </option>
                 <option>
                     <name>CCOptStrategy</name>
@@ -415,7 +415,7 @@
                 </option>
                 <option>
                     <name>CCOptLevelSlave</name>
-                    <state>2</state>
+                    <state>0</state>
                 </option>
                 <option>
                     <name>CCPosIndRopi</name>
@@ -1183,25 +1183,25 @@
                     <name>$PROJ_DIR$\..\Core\Inc\global_types.h</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\i2c.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\i2c.c</name>
-                </file>
-                <file>
                     <name>$PROJ_DIR$\..\Core\Src\gpio.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\httpd_netconn.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\ktv.h</name>
+                    <name>$PROJ_DIR$\..\Core\Src\i2c.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Inc\i2c.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Src\keyboard.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\ktv.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\Core\Src\keyboard.c</name>
+                    <name>$PROJ_DIR$\..\Core\Inc\ktv.h</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\main.c</name>
@@ -1334,6 +1334,12 @@
                 <name>$PROJ_DIR$\..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_gpio.c</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_i2c.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_i2c_ex.c</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_pwr.c</name>
             </file>
             <file>
@@ -1347,12 +1353,6 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_rtc.c</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_i2c.c</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_i2c_ex.c</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_spi.c</name>

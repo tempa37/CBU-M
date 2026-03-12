@@ -22,6 +22,14 @@
 
 /* USER CODE BEGIN 0 */
 
+#ifdef i2c
+#define EEPROM_24C64_I2C_ADDR          (0x50U << 1)
+#define EEPROM_I2C_READY_TRIES         3U
+#define EEPROM_I2C_READY_TIMEOUT_MS    100U
+
+static volatile uint8_t eeprom_ready = 0U;
+#endif
+
 /* USER CODE END 0 */
 
 #ifdef i2c
@@ -136,6 +144,18 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
 }
 
 /* USER CODE BEGIN 1 */
+
+void EEPROM_Probe(void) {
+  eeprom_ready = 0U;
+
+  if (HAL_I2C_IsDeviceReady(&hi2c1, EEPROM_24C64_I2C_ADDR, EEPROM_I2C_READY_TRIES, EEPROM_I2C_READY_TIMEOUT_MS) == HAL_OK) {
+    eeprom_ready = 1U;
+  }
+}
+
+uint8_t EEPROM_IsReady(void) {
+  return eeprom_ready;
+}
 
 /* USER CODE END 1 */
 

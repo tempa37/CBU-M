@@ -228,6 +228,11 @@ let out_time = n(Math.floor(hour / 24), 3)  +' д ' +  n(Math.floor(hour % 24), 
 n(Math.floor(min % 60), 2) +' м ' + n(Math.floor(settings_json.uptime % 60), 2) + " c";
 
 document.getElementById("uptime").textContent = out_time;
+
+let eepromStatus = document.getElementById("eeprom-status");
+if (eepromStatus != null) {
+eepromStatus.textContent = Number(settings_json.eeprom_ready) === 1 ? "связь с eeprom есть" : "связь с eeprom нет";
+}
 // 1
 document.getElementById("usk_ip").value = settings_json.usk_ip;
 

@@ -17,6 +17,9 @@
 #include "main.h"
 #include "keyboard.h"
 #include "ktv.h"
+#ifdef i2c
+#include "i2c.h"
+#endif
 #include <stdio.h>
 
 // for function mktime() & difftime()
@@ -461,6 +464,11 @@ static void stage_keyboard_state(struct netconn *conn) {
 
 void stage_set(struct netconn *conn, uint8_t config) {
   if (osSemaphoreAcquire(httpdbufSemaphore, 100) == osOK) {
+#ifdef i2c
+    uint8_t eeprom_ready = EEPROM_IsReady();
+#else
+    uint8_t eeprom_ready = 0U;
+#endif
     memset(html, 0, HTML_LEN);
     
     length_html = 0;
@@ -501,6 +509,7 @@ void stage_set(struct netconn *conn, uint8_t config) {
     length_html += sprintf((char*)(html + length_html), "\"mac1\":\"%X\",", identification.mac_octet_5);
     // int to string hex value
     length_html += sprintf((char*)(html + length_html), "\"mac0\":\"%X\",", identification.mac_octet_6);
+    length_html += sprintf((char*)(html + length_html), "\"eeprom_ready\":%u,", eeprom_ready);
     length_html += sprintf((char*)(html + length_html), "\"uptime\":\"%d\"}", HAL_GetTick()/1000);
     
     //

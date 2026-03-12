@@ -5,8 +5,13 @@
 #endif
 #include <stdint.h>
 
+
+
+//#define KEYBOARD_PCF8575_ADDR  0x25
+//#define KEYBOARD_PCF8575_ADDR  (0x25 << 1)
 #define KEYBOARD_PCF8575_ADDR        (0x23U << 1)
-#define KEYBOARD_I2C_TIMEOUT_MS      20U
+//#define KEYBOARD_PCF8575_ADDR        0x23 
+#define KEYBOARD_I2C_TIMEOUT_MS      200U
 #define KEYBOARD_I2C_READY_TRIES     3U
 #define KEYBOARD_PCF8575_INPUT_STATE 0xFFFFU
 

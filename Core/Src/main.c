@@ -113,6 +113,7 @@ int main(void) {
   MX_DMA_Init();
 #ifdef i2c
   MX_I2C1_Init();
+  EEPROM_Probe();
 #endif
   MX_SPI4_Init();
   MX_USART1_UART_Init();

@@ -43,6 +43,7 @@ hr{height:1px;margin:12px 0;border:0;background:linear-gradient(90deg,rgba(28,47
 .relay-test-row{display:flex;align-items:center;gap:12px;margin:6px 0 4px}
 .relay-test-status{font-weight:700;color:#8a6508}
 #relay-test-run-btn:disabled{background:#8a949b;color:#eef2f4}
+.status-text{text-align:center!important;font-weight:700!important;letter-spacing:normal!important;text-transform:none!important;color:#29495d}
 .ktv-summary{text-align:left!important;font-weight:600!important;letter-spacing:normal!important;text-transform:none!important;font-size:13px;color:#29495d}
 #notice{padding:6px 2px;min-height:18px;color:#29495d;font-weight:700}
 @media(max-width:720px){body{padding:12px}.pident{grid-template-columns:repeat(2,1fr)}.elem0,.relay-test-row{flex-direction:column;align-items:stretch}.left_col,.right_col,input[type="button"],input[type="file"],button{width:100%;max-width:none}}
@@ -256,7 +257,7 @@ hr{height:1px;margin:12px 0;border:0;background:linear-gradient(90deg,rgba(28,47
 <div id="frame5" class="frame">
 <div class="elem0">
 <div class="left_col">Тест EEPROM</div>
-<div class="right_col"><button type="button">Проверить связь</button></div>
+<div class="right_col"><div id="eeprom-status" class="status-text">связь с eeprom нет</div></div>
 </div>
 
 <div class="elem0">

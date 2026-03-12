@@ -42,6 +42,8 @@ extern I2C_HandleTypeDef hi2c1;
 
 #ifdef i2c
 void MX_I2C1_Init(void);
+void EEPROM_Probe(void);
+uint8_t EEPROM_IsReady(void);
 #endif
 
 /* USER CODE BEGIN Prototypes */
