@@ -33,6 +33,7 @@
 #define EEPROM_POST_WRITE_READY_TRIES   10U
 
 static HAL_StatusTypeDef EEPROM_VerifyReadWrite(uint16_t mem_addr_size);
+static HAL_StatusTypeDef EEPROM_VerifyReadable(uint16_t mem_addr_size);
 
 static volatile uint8_t eeprom_ready = 0U;
 #endif
@@ -159,6 +160,10 @@ void EEPROM_Probe(void) {
     if (EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_16BIT) == HAL_OK ||
         EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_8BIT) == HAL_OK) {
       eeprom_ready = 1U;
+    } else if (EEPROM_VerifyReadable(I2C_MEMADD_SIZE_16BIT) == HAL_OK ||
+               EEPROM_VerifyReadable(I2C_MEMADD_SIZE_8BIT) == HAL_OK) {
+      /* Write may be blocked by hardware WP pin: treat readable EEPROM as present. */
+      eeprom_ready = 1U;
     }
   }
 }
@@ -220,6 +225,22 @@ static HAL_StatusTypeDef EEPROM_VerifyReadWrite(uint16_t mem_addr_size) {
                             EEPROM_24C64_I2C_ADDR,
                             EEPROM_POST_WRITE_READY_TRIES,
                             EEPROM_I2C_READY_TIMEOUT_MS) != HAL_OK) {
+    return HAL_ERROR;
+  }
+
+  return HAL_OK;
+}
+
+static HAL_StatusTypeDef EEPROM_VerifyReadable(uint16_t mem_addr_size) {
+  uint8_t value = 0U;
+
+  if (HAL_I2C_Mem_Read(&hi2c1,
+                       EEPROM_24C64_I2C_ADDR,
+                       EEPROM_TEST_ADDR,
+                       mem_addr_size,
+                       &value,
+                       1U,
+                       EEPROM_READ_TIMEOUT_MS) != HAL_OK) {
     return HAL_ERROR;
   }
 
