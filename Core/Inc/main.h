@@ -78,6 +78,9 @@ void Error_Handler(void);
 #define WDI_Pin GPIO_PIN_2
 #define WDI_GPIO_Port GPIOB
 
+#define EEPROM_WP_Pin GPIO_PIN_5
+#define EEPROM_WP_GPIO_Port GPIOB
+
 #define INT_LAN8710_Pin GPIO_PIN_7
 #define INT_LAN8710_GPIO_Port GPIOE
 

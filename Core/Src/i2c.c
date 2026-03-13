@@ -31,9 +31,11 @@
 #define EEPROM_READ_TIMEOUT_MS         100U
 #define EEPROM_WRITE_VERIFY_BYTE        0xA5U
 #define EEPROM_POST_WRITE_READY_TRIES   10U
+#define EEPROM_OP_DELAY_MS               5U
 
 static HAL_StatusTypeDef EEPROM_VerifyReadWrite(uint16_t mem_addr_size);
-static HAL_StatusTypeDef EEPROM_VerifyReadable(uint16_t mem_addr_size);
+static void EEPROM_SetWriteProtect(GPIO_PinState state);
+static void EEPROM_OperationDelay(void);
 
 static volatile uint8_t eeprom_ready = 0U;
 #endif
@@ -156,13 +158,16 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
 void EEPROM_Probe(void) {
   eeprom_ready = 0U;
 
+  EEPROM_OperationDelay();
   if (HAL_I2C_IsDeviceReady(&hi2c1, EEPROM_24C64_I2C_ADDR, EEPROM_I2C_READY_TRIES, EEPROM_I2C_READY_TIMEOUT_MS) == HAL_OK) {
-    if (EEPROM_VerifyReadable(I2C_MEMADD_SIZE_16BIT) == HAL_OK) {
+    EEPROM_OperationDelay();
+    if (EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_16BIT) == HAL_OK) {
       eeprom_ready = 1U;
-      (void)EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_16BIT);
-    } else if (EEPROM_VerifyReadable(I2C_MEMADD_SIZE_8BIT) == HAL_OK) {
-      eeprom_ready = 1U;
-      (void)EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_8BIT);
+    } else {
+      EEPROM_OperationDelay();
+      if (EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_8BIT) == HAL_OK) {
+        eeprom_ready = 1U;
+      }
     }
   }
 }
@@ -172,6 +177,10 @@ static HAL_StatusTypeDef EEPROM_VerifyReadWrite(uint16_t mem_addr_size) {
   uint8_t verify_byte = 0U;
   uint8_t write_byte = EEPROM_WRITE_VERIFY_BYTE;
 
+  EEPROM_OperationDelay();
+  EEPROM_SetWriteProtect(GPIO_PIN_RESET);
+
+  EEPROM_OperationDelay();
   if (HAL_I2C_Mem_Read(&hi2c1,
                        EEPROM_24C64_I2C_ADDR,
                        EEPROM_TEST_ADDR,
@@ -179,9 +188,11 @@ static HAL_StatusTypeDef EEPROM_VerifyReadWrite(uint16_t mem_addr_size) {
                        &original_byte,
                        1U,
                        EEPROM_READ_TIMEOUT_MS) != HAL_OK) {
+    EEPROM_SetWriteProtect(GPIO_PIN_SET);
     return HAL_ERROR;
   }
 
+  EEPROM_OperationDelay();
   if (HAL_I2C_Mem_Write(&hi2c1,
                         EEPROM_24C64_I2C_ADDR,
                         EEPROM_TEST_ADDR,
@@ -189,16 +200,20 @@ static HAL_StatusTypeDef EEPROM_VerifyReadWrite(uint16_t mem_addr_size) {
                         &write_byte,
                         1U,
                         EEPROM_WRITE_TIMEOUT_MS) != HAL_OK) {
+    EEPROM_SetWriteProtect(GPIO_PIN_SET);
     return HAL_ERROR;
   }
 
+  EEPROM_OperationDelay();
   if (HAL_I2C_IsDeviceReady(&hi2c1,
                             EEPROM_24C64_I2C_ADDR,
                             EEPROM_POST_WRITE_READY_TRIES,
                             EEPROM_I2C_READY_TIMEOUT_MS) != HAL_OK) {
+    EEPROM_SetWriteProtect(GPIO_PIN_SET);
     return HAL_ERROR;
   }
 
+  EEPROM_OperationDelay();
   if (HAL_I2C_Mem_Read(&hi2c1,
                        EEPROM_24C64_I2C_ADDR,
                        EEPROM_TEST_ADDR,
@@ -207,9 +222,11 @@ static HAL_StatusTypeDef EEPROM_VerifyReadWrite(uint16_t mem_addr_size) {
                        1U,
                        EEPROM_READ_TIMEOUT_MS) != HAL_OK ||
       verify_byte != write_byte) {
+    EEPROM_SetWriteProtect(GPIO_PIN_SET);
     return HAL_ERROR;
   }
 
+  EEPROM_OperationDelay();
   if (HAL_I2C_Mem_Write(&hi2c1,
                         EEPROM_24C64_I2C_ADDR,
                         EEPROM_TEST_ADDR,
@@ -217,33 +234,31 @@ static HAL_StatusTypeDef EEPROM_VerifyReadWrite(uint16_t mem_addr_size) {
                         &original_byte,
                         1U,
                         EEPROM_WRITE_TIMEOUT_MS) != HAL_OK) {
+    EEPROM_SetWriteProtect(GPIO_PIN_SET);
     return HAL_ERROR;
   }
 
+  EEPROM_OperationDelay();
   if (HAL_I2C_IsDeviceReady(&hi2c1,
                             EEPROM_24C64_I2C_ADDR,
                             EEPROM_POST_WRITE_READY_TRIES,
                             EEPROM_I2C_READY_TIMEOUT_MS) != HAL_OK) {
+    EEPROM_SetWriteProtect(GPIO_PIN_SET);
     return HAL_ERROR;
   }
 
+  EEPROM_OperationDelay();
+  EEPROM_SetWriteProtect(GPIO_PIN_SET);
   return HAL_OK;
 }
 
-static HAL_StatusTypeDef EEPROM_VerifyReadable(uint16_t mem_addr_size) {
-  uint8_t value = 0U;
+static void EEPROM_SetWriteProtect(GPIO_PinState state) {
+  EEPROM_OperationDelay();
+  HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, state);
+}
 
-  if (HAL_I2C_Mem_Read(&hi2c1,
-                       EEPROM_24C64_I2C_ADDR,
-                       EEPROM_TEST_ADDR,
-                       mem_addr_size,
-                       &value,
-                       1U,
-                       EEPROM_READ_TIMEOUT_MS) != HAL_OK) {
-    return HAL_ERROR;
-  }
-
-  return HAL_OK;
+static void EEPROM_OperationDelay(void) {
+  HAL_Delay(EEPROM_OP_DELAY_MS);
 }
 
 uint8_t EEPROM_IsReady(void) {
