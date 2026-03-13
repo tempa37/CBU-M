@@ -157,13 +157,12 @@ void EEPROM_Probe(void) {
   eeprom_ready = 0U;
 
   if (HAL_I2C_IsDeviceReady(&hi2c1, EEPROM_24C64_I2C_ADDR, EEPROM_I2C_READY_TRIES, EEPROM_I2C_READY_TIMEOUT_MS) == HAL_OK) {
-    if (EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_16BIT) == HAL_OK ||
-        EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_8BIT) == HAL_OK) {
+    if (EEPROM_VerifyReadable(I2C_MEMADD_SIZE_16BIT) == HAL_OK) {
       eeprom_ready = 1U;
-    } else if (EEPROM_VerifyReadable(I2C_MEMADD_SIZE_16BIT) == HAL_OK ||
-               EEPROM_VerifyReadable(I2C_MEMADD_SIZE_8BIT) == HAL_OK) {
-      /* Write may be blocked by hardware WP pin: treat readable EEPROM as present. */
+      (void)EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_16BIT);
+    } else if (EEPROM_VerifyReadable(I2C_MEMADD_SIZE_8BIT) == HAL_OK) {
       eeprom_ready = 1U;
+      (void)EEPROM_VerifyReadWrite(I2C_MEMADD_SIZE_8BIT);
     }
   }
 }
