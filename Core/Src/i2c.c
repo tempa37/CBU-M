@@ -26,6 +26,11 @@
 #define EEPROM_24C64_I2C_ADDR          (0x50U << 1)
 #define EEPROM_I2C_READY_TRIES         3U
 #define EEPROM_I2C_READY_TIMEOUT_MS    100U
+#define EEPROM_MEM_ADDR_SIZE           I2C_MEMADD_SIZE_16BIT
+#define EEPROM_TEST_ADDR               0x0000U
+#define EEPROM_WRITE_TIMEOUT_MS        100U
+#define EEPROM_READ_TIMEOUT_MS         100U
+#define EEPROM_WRITE_CYCLE_DELAY_MS    10U
 
 static volatile uint8_t eeprom_ready = 0U;
 #endif
@@ -146,10 +151,32 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
 /* USER CODE BEGIN 1 */
 
 void EEPROM_Probe(void) {
+  const uint8_t write_byte = 0xA5U;
+  uint8_t read_byte = 0U;
+
   eeprom_ready = 0U;
 
   if (HAL_I2C_IsDeviceReady(&hi2c1, EEPROM_24C64_I2C_ADDR, EEPROM_I2C_READY_TRIES, EEPROM_I2C_READY_TIMEOUT_MS) == HAL_OK) {
-    eeprom_ready = 1U;
+    if (HAL_I2C_Mem_Write(&hi2c1,
+                          EEPROM_24C64_I2C_ADDR,
+                          EEPROM_TEST_ADDR,
+                          EEPROM_MEM_ADDR_SIZE,
+                          (uint8_t*)&write_byte,
+                          1U,
+                          EEPROM_WRITE_TIMEOUT_MS) == HAL_OK) {
+      HAL_Delay(EEPROM_WRITE_CYCLE_DELAY_MS);
+
+      if (HAL_I2C_Mem_Read(&hi2c1,
+                           EEPROM_24C64_I2C_ADDR,
+                           EEPROM_TEST_ADDR,
+                           EEPROM_MEM_ADDR_SIZE,
+                           &read_byte,
+                           1U,
+                           EEPROM_READ_TIMEOUT_MS) == HAL_OK &&
+          read_byte == write_byte) {
+        eeprom_ready = 1U;
+      }
+    }
   }
 }
 
